@@ -1,0 +1,105 @@
+# tests -> version check -> source archive -> GitHub release
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Check the tag matches the project version
+        run: python .github/scripts/check_version.py --file bin/hexwall --regex '^VERSION="([^"]+)"'
+
+  build:
+    needs: [test, check-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the source archive
+        run: |
+          mkdir dist
+          git archive --format=tar.gz --prefix="caelestia-hexwall-${GITHUB_REF_NAME#v}/" \
+            -o "dist/caelestia-hexwall-${GITHUB_REF_NAME#v}.tar.gz" HEAD
+
+      - name: Smoke test the archive
+        run: |
+          mkdir /tmp/unpacked
+          tar -xzf dist/*.tar.gz -C /tmp/unpacked
+          out=$(/tmp/unpacked/caelestia-hexwall-*/bin/hexwall --version)
+          echo "$out"
+          test "$out" = "hexwall v${GITHUB_REF_NAME#v}"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # required to create a GitHub Release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history + tags -- needed to diff against the previous release tag
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - name: Build release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          RANGE="${PREV_TAG:+$PREV_TAG..}${GITHUB_REF_NAME}"
+
+          python3 .github/scripts/categorize_changelog.py "$RANGE" > changelog_section.md
+
+          gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$GITHUB_REF_NAME" --jq .body > auto_notes.md
+
+          {
+            cat auto_notes.md
+            echo ""
+            echo ""
+            cat changelog_section.md
+          } > release_notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release_notes.md
+
+  bump-homebrew-formula:
+    needs: github-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dawidd6/action-homebrew-bump-formula@b12d2bc99c46444125e606142f28200ec71a1214 # v10
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          tap: ManeFunction/homebrew-tap
+          formula: caelestia-hexwall
+          no_fork: "true"

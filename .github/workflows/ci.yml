@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call: # reused by release.yml so a tag can't ship with failing tests
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Lint shell scripts
+        run: shellcheck bin/hexwall install.sh tests/test.sh
+
+      - name: Run tests
+        run: bash tests/test.sh

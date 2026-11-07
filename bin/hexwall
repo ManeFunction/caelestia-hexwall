@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# hexwall: animated hexagonal wallpaper for the Caelestia shell.
+# Copies the wallpaper QML + shader into the Caelestia shell config and hooks it into the background module.
+set -euo pipefail
+
+VERSION="0.9.0"
+NAME="hexwall"
+MARK_BEGIN="// caelestia-hexwall:begin"
+MARK_END="// caelestia-hexwall:end"
+ANCHOR="            Visualiser {"
+SYSTEM_SHELL="/etc/xdg/quickshell/caelestia"
+FILES=(HexWallpaper.qml hexgrid.frag.qsb)
+
+die() { echo "$NAME: $*" >&2; exit 1; }
+
+usage() {
+    cat <<EOF
+$NAME v$VERSION: animated hexagonal wallpaper for the Caelestia shell
+
+Usage:
+  $NAME activate [--theme light|dark|auto] [--animate on|off|auto] [--shell-dir DIR] [--no-restart]
+  $NAME deactivate [--shell-dir DIR] [--no-restart]
+  $NAME status [--shell-dir DIR]
+  $NAME --version (-v) | --help (-h)
+
+Theme:   auto (default, follows the Caelestia light/dark mode), light, dark.
+Animate: auto (default, animates on AC power and freezes on battery), on (always), off (never).
+
+Every activate sets all options; the ones you leave out go back to their defaults.
+
+The shell is looked up in \$CAELESTIA_SHELL_DIR, then ~/.config/quickshell/caelestia.
+If that folder does not exist and Caelestia is installed system-wide ($SYSTEM_SHELL),
+activate makes a personal copy of it first. Re-run activate after upgrading the
+system Caelestia package.
+
+The shell is restarted (caelestia shell -r -d) after activate and deactivate so the
+change shows at once; --no-restart skips that and prints the command instead.
+EOF
+}
+
+# Folder holding the QML and the compiled shader: ../share/caelestia-hexwall next to this script
+# (works from the git checkout, from Homebrew and from install.sh), or $HEXWALL_DATA.
+data_dir() {
+    if [ -n "${HEXWALL_DATA:-}" ]; then echo "$HEXWALL_DATA"; return; fi
+    local here
+    here="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+    echo "$here/../share/caelestia-hexwall"
+}
+
+shell_dir=""
+theme="auto"
+animate="auto"
+restart=1
+
+parse_opts() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --theme) [ $# -ge 2 ] || die "--theme needs a value"; theme="$2"; shift 2 ;;
+            --animate) [ $# -ge 2 ] || die "--animate needs a value"; animate="$2"; shift 2 ;;
+            --shell-dir) [ $# -ge 2 ] || die "--shell-dir needs a value"; shell_dir="$2"; shift 2 ;;
+            --no-restart) restart=0; shift ;;
+            *) die "unknown option: $1 (see --help)" ;;
+        esac
+    done
+    shell_dir="${shell_dir:-${CAELESTIA_SHELL_DIR:-$HOME/.config/quickshell/caelestia}}"
+}
+
+background_qml() { echo "$shell_dir/modules/background/Background.qml"; }
+
+has_block() { grep -qF "$MARK_BEGIN" "$(background_qml)"; }
+
+# Print Background.qml without our block.
+without_block() {
+    awk -v b="$MARK_BEGIN" -v e="$MARK_END" '
+        index($0, b) { skip = 1 }
+        !skip { print }
+        index($0, e) { skip = 0; getline nxt; if (nxt != "") print nxt }
+    ' "$(background_qml)"
+}
+
+remove_block() {
+    local tmp
+    tmp="$(mktemp)"
+    without_block > "$tmp"
+    cat "$tmp" > "$(background_qml)"
+    rm -f "$tmp"
+}
+
+maybe_restart() {
+    if [ "$restart" = 1 ]; then
+        if command -v caelestia >/dev/null 2>&1; then
+            caelestia shell -r -d >/dev/null 2>&1
+            echo "shell restarted"
+            return 0
+        fi
+        echo "caelestia command not found, restart the shell yourself: caelestia shell -r -d"
+    else
+        echo "not restarted; to see the change run: caelestia shell -r -d"
+    fi
+}
+
+cmd_activate() {
+    parse_opts "$@"
+    case "$theme" in light|dark|auto) ;; *) die "unknown theme: $theme (light, dark or auto)" ;; esac
+    case "$animate" in on|off|auto) ;; *) die "unknown animate value: $animate (on, off or auto)" ;; esac
+
+    local data
+    data="$(data_dir)"
+    for f in "${FILES[@]}"; do [ -f "$data/$f" ] || die "missing $data/$f (broken installation)"; done
+
+    if [ ! -f "$shell_dir/shell.qml" ]; then
+        if [ -z "${CAELESTIA_SHELL_DIR:-}" ] && [ "$shell_dir" = "$HOME/.config/quickshell/caelestia" ] && [ -f "$SYSTEM_SHELL/shell.qml" ]; then
+            echo "making a personal copy of $SYSTEM_SHELL in $shell_dir"
+            echo "(it takes precedence over the system one; re-run activate after upgrading Caelestia)"
+            mkdir -p "$(dirname "$shell_dir")"
+            cp -r "$SYSTEM_SHELL" "$shell_dir"
+        else
+            die "no Caelestia shell found in $shell_dir (use --shell-dir)"
+        fi
+    fi
+
+    local bg
+    bg="$(background_qml)"
+    [ -f "$bg" ] || die "$bg not found: this Caelestia version has a different layout"
+
+    has_block && remove_block
+    [ "$(grep -cxF "$ANCHOR" "$bg")" = 1 ] \
+        || die "$bg no longer matches what this tool expects (looked for the Visualiser block); not changed"
+
+    local block tmp
+    block="            $MARK_BEGIN
+            Loader {
+                anchors.fill: parent
+                active: Config.background.wallpaperEnabled
+
+                sourceComponent: HexWallpaper {
+                    theme: \"$theme\"
+                    animation: \"$animate\"
+                }
+            }
+            $MARK_END
+"
+    tmp="$(mktemp)"
+    awk -v blk="$block" -v a="$ANCHOR" '$0 == a { printf "%s\n", blk } { print }' "$bg" > "$tmp"
+    cat "$tmp" > "$bg"
+    rm -f "$tmp"
+
+    for f in "${FILES[@]}"; do cp "$data/$f" "$shell_dir/modules/background/$f"; done
+    echo "activated in $shell_dir"
+    maybe_restart
+}
+
+cmd_deactivate() {
+    parse_opts "$@"
+    [ -f "$(background_qml)" ] || die "$(background_qml) not found"
+    has_block && remove_block
+    for f in "${FILES[@]}"; do rm -f "$shell_dir/modules/background/$f"; done
+    echo "deactivated in $shell_dir"
+    maybe_restart
+}
+
+# Theme and animate setting read back from the inserted block.
+without_markers_info() {
+    awk -v b="$MARK_BEGIN" -v e="$MARK_END" '
+        index($0, b) { on = 1 }
+        on && /theme:/ { gsub(/"/, "", $2); print "theme: " $2 }
+        on && /animation:/ { gsub(/"/, "", $2); print "animate: " $2 }
+        index($0, e) { on = 0 }
+    ' "$(background_qml)"
+}
+
+cmd_status() {
+    parse_opts "$@"
+    echo "shell folder: $shell_dir"
+    [ -f "$(background_qml)" ] || { echo "no Caelestia shell here"; return 0; }
+    if has_block; then
+        local info
+        info="$(without_markers_info)"
+        echo "active: yes"
+        echo "$info"
+    else
+        echo "active: no"
+    fi
+}
+
+case "${1:-}" in
+    activate) shift; cmd_activate "$@" ;;
+    deactivate) shift; cmd_deactivate "$@" ;;
+    status) shift; cmd_status "$@" ;;
+    --version|-v|-V) echo "$NAME v$VERSION" ;;
+    --help|-h|help|"") usage ;;
+    *) die "unknown command: $1 (see --help)" ;;
+esac
