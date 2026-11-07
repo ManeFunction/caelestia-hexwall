@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Tests against a fake Caelestia shell folder; no Caelestia needed.
+# check() evals single-quoted strings, so BG etc. are used there (SC2034/SC2016).
+# shellcheck disable=SC2016,SC2034
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TOOL="$ROOT/bin/hexwall"
@@ -88,4 +90,4 @@ check "installed tool finds its data" '"$PFX/bin/hexwall" status --shell-dir "$S
 "$ROOT/install.sh" --uninstall --prefix "$PFX" --shell-dir "$SH2" >/dev/null
 check "install.sh --deactivate removes tool and wallpaper" '[ ! -e "$PFX/bin/hexwall" ] && [ ! -d "$PFX/share/caelestia-hexwall" ] && ! grep -q "caelestia-hexwall" "$SH2/modules/background/Background.qml"'
 
-[ "$fails" = 0 ] && echo "all passed" || { echo "$fails failed"; exit 1; }
+if [ "$fails" = 0 ]; then echo "all passed"; else echo "$fails failed"; exit 1; fi
