@@ -15,7 +15,7 @@ Made with a tiny shader patched right to your shell.
 
 - **Hexagonal grid** with light running along the hex edges, in greys with black accents.
 - **Power aware:** by default it animates (about 30 fps) only on AC power and freezes the picture as it is on
-  battery. `--animate on|off` overrides that.
+  battery or while Caelestia's game mode is on. `--animate on|off` overrides that.
 - **Follows the theme:** by default it switches between light and dark palettes when Caelestia is in light or dark mode accordingly.
   `--theme light|dark` forces one.
 - **Light on the system:** one shader pass, no video, no extra daemon. It is drawn by the shell itself, on top of
@@ -57,7 +57,7 @@ hexwall deactivate                # disable hexwall
 | Option | Values | Default |
 |---|---|---|
 | `--theme` | `light`, `dark`, `auto` (follow the Caelestia light/dark mode) | `auto` |
-| `--animate` | `on` (always), `off` (still picture), `auto` (only on AC power, frozen on battery) | `auto` |
+| `--animate` | `on` (always), `off` (still picture), `auto` (only on AC power, frozen on battery and in game mode) | `auto` |
 
 Every `activate` sets all the options; the ones you leave out go back to their defaults.
 
@@ -89,7 +89,7 @@ and notifications disappear when it restarts. With `--no-restart` the tool leave
 `activate` copies `HexWallpaper.qml` and the compiled shader `hexgrid.frag.qsb` into
 `modules/background/` of the shell and inserts one `Loader` (marked with `caelestia-hexwall:begin/end` comments)
 into `Background.qml`. `deactivate` removes exactly that block and those files. The animation clock stops while
-UPower reports that the machine runs on battery, and the colours follow Caelestia's `Colours.light`.
+UPower reports that the machine runs on battery or Caelestia's game mode is on, and the colours follow Caelestia's `Colours.light`.
 
 ---
 

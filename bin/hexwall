@@ -24,7 +24,7 @@ Usage:
   $NAME --version (-v) | --help (-h)
 
 Theme:   auto (default, follows the Caelestia light/dark mode), light, dark.
-Animate: auto (default, animates on AC power and freezes on battery), on (always), off (never).
+Animate: auto (default, animates on AC power, freezes on battery and in game mode), on (always), off (never).
 
 Every activate sets all options; the ones you leave out go back to their defaults.
 

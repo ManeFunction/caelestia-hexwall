@@ -3,11 +3,11 @@ import Quickshell.Services.UPower
 import qs.services
 
 // Animated hexagonal-grid wallpaper: grey palette, black accents, light running around hex edges.
-// Animates (30 fps) only on AC power; on battery the picture freezes as it is.
+// Animates (30 fps) only on AC power and outside game mode; otherwise the picture freezes as it is.
 Item {
     id: root
 
-    // seconds of animation; the clock only advances while on AC
+    // seconds of animation; the clock only advances while animating
     property real t: 0
     // Set by `hexwall activate`: theme "auto" | "light" | "dark", animation "auto" | "on" | "off"
     property string theme: "auto"
@@ -18,8 +18,8 @@ Item {
     property real lightMix: isLight ? 1 : 0
     Behavior on lightMix { NumberAnimation { duration: 500 } }
 
-    // auto: only on AC power
-    readonly property bool animate: animation === "on" || (animation === "auto" && !UPower.onBattery)
+    // auto: only on AC power and while Caelestia's game mode is off
+    readonly property bool animate: animation === "on" || (animation === "auto" && !UPower.onBattery && !GameMode.enabled)
 
     Timer {
         interval: 33
