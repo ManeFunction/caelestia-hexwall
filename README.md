@@ -54,10 +54,9 @@ hexwall status                    # is it active, with which options
 hexwall deactivate                # disable hexwall
 ```
 
-| Option | Values | Default |
-|---|---|---|
-| `--theme` | `light`, `dark`, `auto` (follow the Caelestia light/dark mode) | `auto` |
-| `--animate` | `on` (always), `off` (still picture), `auto` (only on AC power, frozen on battery and in game mode) | `auto` |
+- `--theme`: `light`, `dark`, or `auto` (follow the Caelestia light/dark mode). Default: `auto`.
+- `--animate`: `on` (always), `off` (still picture), or `auto` (only on AC power, frozen on battery and in game
+  mode). Default: `auto`.
 
 Every `activate` sets all the options; the ones you leave out go back to their defaults.
 
