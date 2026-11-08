@@ -32,7 +32,7 @@ Made with a tiny shader patched right to your shell.
     - Type `brew install caelestia-hexwall` to install the application itself.
     - Verify the installation with `hexwall --version` (or `-v`).
     - Type `hexwall activate` to add the wallpaper to your Caelestia shell.
-    - You are perfect, you can use the app with `hexwall` from any folder in your system.
+    - You are perfect, you can tune your wallpaper settings with `hexwall` from any folder in your system.
 2) **Install script (no Homebrew needed)**
     - Clone the repository or download the source code from GitHub.
     - Go to the folder with the code in your Terminal.
