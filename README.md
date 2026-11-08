@@ -11,8 +11,6 @@ Made with a tiny shader patched right to your shell.
 ![](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexwall/light.png)
 [> watch animated video (~4.5 Mb)](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexwall/light.mp4)
 
----
-
 ## Features
 
 - **Hexagonal grid** with light running along the hex edges, in greys with black accents.
@@ -23,8 +21,6 @@ Made with a tiny shader patched right to your shell.
 - **Light on the system:** one shader pass, no video, no extra daemon. It is drawn by the shell itself, on top of
   your normal wallpaper.
 - **Easy to remove:** `hexwall deactivate` puts the shell back exactly as it was.
-
----
 
 ## Installation
 
@@ -43,8 +39,6 @@ Made with a tiny shader patched right to your shell.
     - Run `./install.sh`. It installs the command into `~/.local/bin` and activates the wallpaper in your
       Caelestia shell.
     - Run `hexwall --version` (or `-v`) to verify the install.
-
----
 
 ## Usage
 
@@ -83,16 +77,12 @@ and notifications disappear when it restarts. With `--no-restart` the tool leave
   looks different, `activate` stops and changes nothing.
 - It draws over the still wallpaper, so that image stays underneath and is not changed.
 
----
-
 ## How it works
 
 `activate` copies `HexWallpaper.qml` and the compiled shader `hexgrid.frag.qsb` into
 `modules/background/` of the shell and inserts one `Loader` (marked with `caelestia-hexwall:begin/end` comments)
 into `Background.qml`. `deactivate` removes exactly that block and those files. The animation clock stops while
 UPower reports that the machine runs on battery or Caelestia's game mode is on, and the colours follow Caelestia's `Colours.light`.
-
----
 
 ## Development
 
@@ -103,14 +93,11 @@ shellcheck bin/hexwall activate.sh tests/test.sh
 /usr/lib64/qt6/bin/qsb --qt6 -o share/caelestia-hexwall/hexgrid.frag.qsb shader/hexgrid.frag
 ```
 
----
-
 ## Credits
 
 Built on [Quickshell](https://quickshell.org/) and the Caelestia shell. This is an unofficial add-on and is not
 affiliated with the Caelestia project. Tested on Hyprland with the Fedora build of Caelestia 2.5.0 on Intel
 graphics; other setups are untested.
-
 
 ## Repository info
 
