@@ -5,9 +5,11 @@ itself only supports still images as wallpapers; this adds an optimmized, abstra
 
 Made with a tiny shader patched right to your shell.
 
-![](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexgrid/dark.png)
+![](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexwall/dark.png)
+[> watch animated video (~4.5 Mb)](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexwall/dark.mp4)
  
-![](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexgrid/light.png)
+![](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexwall/light.png)
+[> watch animated video (~4.5 Mb)](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexwall/light.mp4)
 
 ---
 
