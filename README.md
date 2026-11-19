@@ -15,7 +15,7 @@ Made with a tiny shader patched right to your shell.
 
 - **Hexagonal grid** with light running along the hex edges, in greys with black accents.
 - **Power aware:** by default it animates (about 30 fps) only on AC power and freezes the picture as it is on
-  battery or while Caelestia's game mode is on. `--animate on|off` overrides that.
+  battery, while Caelestia's game mode is on, or while a window is fullscreen on that monitor. `--animate on|off` overrides that.
 - **Follows the theme:** by default it switches between light and dark palettes when Caelestia is in light or dark mode accordingly.
   `--theme light|dark` forces one.
 - **Light on the system:** one shader pass, no video, no extra daemon. It is drawn by the shell itself, on top of
@@ -51,8 +51,8 @@ hexwall deactivate                # disable hexwall
 ```
 
 - `--theme`: `light`, `dark`, or `auto` (follow the Caelestia light/dark mode). Default: `auto`.
-- `--animate`: `on` (always), `off` (still picture), or `auto` (only on AC power, frozen on battery and in game
-  mode). Default: `auto`.
+- `--animate`: `on` (always), `off` (still picture), or `auto` (only on AC power, frozen on battery, in game
+  mode and behind fullscreen windows). Default: `auto`.
 
 Every `activate` sets all the options; the ones you leave out go back to their defaults.
 

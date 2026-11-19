@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-19
+### Changed
+- The animation also pauses while a window is fullscreen on the wallpaper's monitor (in `--animate auto`).
+
 ## [0.9.0] - 2026-11-08
 ### Added
 - Initial release: an animated hexagonal-grid wallpaper for the Caelestia shell.
