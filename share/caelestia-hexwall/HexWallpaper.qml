@@ -41,12 +41,17 @@ Item {
 
     ShaderEffect {
         anchors.fill: parent
+        // Opaque: drawn without blending, and the still wallpaper hidden behind it is skipped by the depth test
+        blending: false
 
-        property real time: root.t
+        // Animation phases, wrapped here in double precision so the shader never sees a large time value
+        property real pulse: (root.t * 0.35) % (2 * Math.PI)
+        property real spin: (root.t * 1.1) % (2 * Math.PI)
         property real cell: 64
         property real lightMix: root.lightMix
         property size res: Qt.size(width, height)
 
+        vertexShader: Qt.resolvedUrl("hexgrid.vert.qsb")
         fragmentShader: Qt.resolvedUrl("hexgrid.frag.qsb")
     }
 }

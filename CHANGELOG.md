@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Changed
+- About half the GPU time per frame, with the same picture. The shader does a third less work per pixel (no `atan`,
+  the theme and per-frame maths moved out of it into a vertex shader), and it is drawn opaque, so the still
+  wallpaper hidden under it is no longer drawn every frame.
+
+### Fixed
+- After about a day of accumulated animation the light froze (or jumped around) while the wallpaper kept
+  redrawing: the shader got the time as one big float. The animation phases are now wrapped before they reach it.
 
 ## [1.0.0] - 2026-11-19
 ### Changed

@@ -79,7 +79,7 @@ and notifications disappear when it restarts. With `--no-restart` the tool leave
 
 ## How it works
 
-`activate` copies `HexWallpaper.qml` and the compiled shader `hexgrid.frag.qsb` into
+`activate` copies `HexWallpaper.qml` and the compiled shaders `hexgrid.vert.qsb` and `hexgrid.frag.qsb` into
 `modules/background/` of the shell and inserts one `Loader` (marked with `caelestia-hexwall:begin/end` comments)
 into `Background.qml`. `deactivate` removes exactly that block and those files. The animation clock stops while
 UPower reports that the machine runs on battery or Caelestia's game mode is on, and the colours follow Caelestia's `Colours.light`.
@@ -88,9 +88,8 @@ UPower reports that the machine runs on battery or Caelestia's game mode is on, 
 
 ```bash
 bash tests/test.sh      # runs against a fake Caelestia folder
-shellcheck bin/hexwall activate.sh tests/test.sh
-# after editing the shader:
-/usr/lib64/qt6/bin/qsb --qt6 -o share/caelestia-hexwall/hexgrid.frag.qsb shader/hexgrid.frag
+shellcheck bin/hexwall install.sh tests/test.sh shader/build.sh
+shader/build.sh         # after editing the shaders: recompiles share/caelestia-hexwall/*.qsb (needs Qt's qsb)
 ```
 
 ## Credits

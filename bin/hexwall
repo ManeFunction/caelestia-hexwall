@@ -9,7 +9,7 @@ MARK_BEGIN="// caelestia-hexwall:begin"
 MARK_END="// caelestia-hexwall:end"
 ANCHOR="            Visualiser {"
 SYSTEM_SHELL="/etc/xdg/quickshell/caelestia"
-FILES=(HexWallpaper.qml hexgrid.frag.qsb)
+FILES=(HexWallpaper.qml hexgrid.vert.qsb hexgrid.frag.qsb)
 
 die() { echo "$NAME: $*" >&2; exit 1; }
 

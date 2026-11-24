@@ -50,7 +50,7 @@ check "--no-restart does not restart" '[ "$(grep -c "shell -r -d" "$TMP/caelesti
 check "deactivate restarts the shell by default" '[ "$(grep -c "shell -r -d" "$TMP/caelestia.log")" = 2 ]'
 "$TOOL" activate --shell-dir "$SH" >/dev/null
 check "activate adds the hex loader once" '[ "$(grep -c "sourceComponent: HexWallpaper {" "$BG")" = 1 ]'
-check "activate copies the files" '[ -f "$SH/modules/background/HexWallpaper.qml" ] && [ -f "$SH/modules/background/hexgrid.frag.qsb" ]'
+check "activate copies the files" '[ -f "$SH/modules/background/HexWallpaper.qml" ] && [ -f "$SH/modules/background/hexgrid.vert.qsb" ] && [ -f "$SH/modules/background/hexgrid.frag.qsb" ]'
 check "loader is placed before Visualiser" '[ "$(grep -n "caelestia-hexwall:begin" "$BG" | cut -d: -f1)" -lt "$(grep -n "Visualiser {" "$BG" | cut -d: -f1)" ]'
 
 "$TOOL" activate --shell-dir "$SH" >/dev/null
@@ -71,7 +71,7 @@ if "$TOOL" activate --animate maybe --shell-dir "$SH" >/dev/null 2>&1; then bad 
 check "status reports it" '"$TOOL" status --shell-dir "$SH" | grep -q "active: yes"'
 "$TOOL" deactivate --shell-dir "$SH" >/dev/null
 check "deactivate restores Background.qml exactly" 'cmp -s "$BG" "$TMP/orig.qml"'
-check "deactivate removes the files" '[ ! -e "$SH/modules/background/HexWallpaper.qml" ] && [ ! -e "$SH/modules/background/hexgrid.frag.qsb" ]'
+check "deactivate removes the files" '[ ! -e "$SH/modules/background/HexWallpaper.qml" ] && [ ! -e "$SH/modules/background/hexgrid.vert.qsb" ] && [ ! -e "$SH/modules/background/hexgrid.frag.qsb" ]'
 check "status after deactivate" '"$TOOL" status --shell-dir "$SH" | grep -q "active: no"'
 
 
