@@ -46,6 +46,7 @@ Made with a tiny shader patched right to your shell.
 hexwall activate                  # add the wallpaper
 hexwall activate --theme dark     # force the dark palette
 hexwall activate --animate on     # animate on battery too
+hexwall activate --size 2         # hexes twice as big
 hexwall status                    # is it active, with which options
 hexwall deactivate                # disable hexwall
 ```
@@ -53,6 +54,8 @@ hexwall deactivate                # disable hexwall
 - `--theme`: `light`, `dark`, or `auto` (follow the Caelestia light/dark mode). Default: `auto`.
 - `--animate`: `on` (always), `off` (still picture), or `auto` (only on AC power, frozen on battery, in game
   mode and behind fullscreen windows). Default: `auto`.
+- `--size`: hex size, from `0.25` to `8` (`1.5` works too). `2` makes the hexes twice as big; the lines and the
+  light keep their width. Default: `1`.
 
 Every `activate` sets all the options; the ones you leave out go back to their defaults.
 

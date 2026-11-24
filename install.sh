@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installer for caelestia-hexwall, no Homebrew needed.
 #   ./install.sh                 install the tool into ~/.local and activate the wallpaper in Caelestia
-#   ./install.sh --theme dark    also --animate on|off|auto (defaults: auto, auto)
+#   ./install.sh --theme dark    also --animate on|off|auto, --size N (defaults: auto, auto, 1)
 #   ./install.sh --no-activate      only install the tool, activate later with: hexwall activate
 #   ./install.sh --uninstall     deactivate the wallpaper in Caelestia AND remove the tool
 # Options: --prefix DIR (default ~/.local), --shell-dir DIR (Caelestia config), --no-restart (do not restart the shell)
@@ -18,7 +18,7 @@ while [ $# -gt 0 ]; do
         --uninstall) mode="uninstall"; shift ;;
         --no-activate) activate=0; shift ;;
         --prefix) [ $# -ge 2 ] || { echo "--prefix needs a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
-        --theme|--animate|--shell-dir) [ $# -ge 2 ] || { echo "$1 needs a value" >&2; exit 1; }; pass+=("$1" "$2"); shift 2 ;;
+        --theme|--animate|--size|--shell-dir) [ $# -ge 2 ] || { echo "$1 needs a value" >&2; exit 1; }; pass+=("$1" "$2"); shift 2 ;;
         --no-restart) pass+=("$1"); shift ;;
         -h|--help) sed -n '2,7p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 1 ;;

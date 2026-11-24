@@ -12,9 +12,11 @@ Item {
 
     // seconds of animation; the clock only advances while animating
     property real t: 0
-    // Set by `hexwall activate`: theme "auto" | "light" | "dark", animation "auto" | "on" | "off"
+    // Set by `hexwall activate`: theme "auto" | "light" | "dark", animation "auto" | "on" | "off",
+    // size: hex size multiplier (1 = hexes 64 px apart; lines and glow keep their width in pixels)
     property string theme: "auto"
     property string animation: "auto"
+    property real size: 1
 
     // follows the Caelestia light/dark mode (unless forced), with a short fade
     readonly property bool isLight: theme === "light" || (theme === "auto" && Colours.light)
@@ -47,7 +49,7 @@ Item {
         // Animation phases, wrapped here in double precision so the shader never sees a large time value
         property real pulse: (root.t * 0.35) % (2 * Math.PI)
         property real spin: (root.t * 1.1) % (2 * Math.PI)
-        property real cell: 64
+        property real cell: 64 * root.size
         property real lightMix: root.lightMix
         property size res: Qt.size(width, height)
 

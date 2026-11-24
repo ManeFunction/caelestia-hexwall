@@ -10,6 +10,8 @@ MARK_END="// caelestia-hexwall:end"
 ANCHOR="            Visualiser {"
 SYSTEM_SHELL="/etc/xdg/quickshell/caelestia"
 FILES=(HexWallpaper.qml hexgrid.vert.qsb hexgrid.frag.qsb)
+SIZE_MIN="0.25"
+SIZE_MAX="8"
 
 die() { echo "$NAME: $*" >&2; exit 1; }
 
@@ -18,13 +20,14 @@ usage() {
 $NAME v$VERSION: animated hexagonal wallpaper for the Caelestia shell
 
 Usage:
-  $NAME activate [--theme light|dark|auto] [--animate on|off|auto] [--shell-dir DIR] [--no-restart]
+  $NAME activate [--theme light|dark|auto] [--animate on|off|auto] [--size N] [--shell-dir DIR] [--no-restart]
   $NAME deactivate [--shell-dir DIR] [--no-restart]
   $NAME status [--shell-dir DIR]
   $NAME --version (-v) | --help (-h)
 
 Theme:   auto (default, follows the Caelestia light/dark mode), light, dark.
 Animate: auto (default, animates on AC power, freezes on battery and in game mode), on (always), off (never).
+Size:    hex size, 1 (default); 2 makes the hexes twice as big. From $SIZE_MIN to $SIZE_MAX, e.g. 1.5.
 
 Every activate sets all options; the ones you leave out go back to their defaults.
 
@@ -50,6 +53,7 @@ data_dir() {
 shell_dir=""
 theme="auto"
 animate="auto"
+size="1"
 restart=1
 
 parse_opts() {
@@ -57,6 +61,7 @@ parse_opts() {
         case "$1" in
             --theme) [ $# -ge 2 ] || die "--theme needs a value"; theme="$2"; shift 2 ;;
             --animate) [ $# -ge 2 ] || die "--animate needs a value"; animate="$2"; shift 2 ;;
+            --size) [ $# -ge 2 ] || die "--size needs a value"; size="$2"; shift 2 ;;
             --shell-dir) [ $# -ge 2 ] || die "--shell-dir needs a value"; shell_dir="$2"; shift 2 ;;
             --no-restart) restart=0; shift ;;
             *) die "unknown option: $1 (see --help)" ;;
@@ -103,6 +108,11 @@ cmd_activate() {
     parse_opts "$@"
     case "$theme" in light|dark|auto) ;; *) die "unknown theme: $theme (light, dark or auto)" ;; esac
     case "$animate" in on|off|auto) ;; *) die "unknown animate value: $animate (on, off or auto)" ;; esac
+    # a plain decimal (it goes into the QML as is), compared in the C locale so 1.5 never reads as 1,5
+    if ! [[ "$size" =~ ^(0|[1-9][0-9]*)(\.[0-9]+)?$ ]] \
+        || ! LC_ALL=C awk -v s="$size" -v lo="$SIZE_MIN" -v hi="$SIZE_MAX" 'BEGIN { exit !(s >= lo && s <= hi) }'; then
+        die "invalid size: $size (a number from $SIZE_MIN to $SIZE_MAX, like 2 or 1.5)"
+    fi
 
     local data
     data="$(data_dir)"
@@ -136,6 +146,7 @@ cmd_activate() {
                 sourceComponent: HexWallpaper {
                     theme: \"$theme\"
                     animation: \"$animate\"
+                    size: $size
                 }
             }
             $MARK_END
@@ -159,13 +170,16 @@ cmd_deactivate() {
     maybe_restart
 }
 
-# Theme and animate setting read back from the inserted block.
+# Theme, animate and size settings read back from the inserted block (blocks from before --size have no size: 1).
 without_markers_info() {
     awk -v b="$MARK_BEGIN" -v e="$MARK_END" '
+        BEGIN { size = "1" }
         index($0, b) { on = 1 }
         on && /theme:/ { gsub(/"/, "", $2); print "theme: " $2 }
         on && /animation:/ { gsub(/"/, "", $2); print "animate: " $2 }
+        on && /size:/ { size = $2 }
         index($0, e) { on = 0 }
+        END { print "size: " size }
     ' "$(background_qml)"
 }
 
