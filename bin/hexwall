@@ -3,7 +3,7 @@
 # Copies the wallpaper QML + shader into the Caelestia shell config and hooks it into the background module.
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 NAME="hexwall"
 MARK_BEGIN="// caelestia-hexwall:begin"
 MARK_END="// caelestia-hexwall:end"
