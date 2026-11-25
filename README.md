@@ -11,6 +11,9 @@ Made with a tiny shader patched right to your shell.
 ![](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexwall/light.png)
 [> watch animated video (~4.5 Mb)](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexwall/light.mp4)
 
+You can change hexes `--size`, vertical `--shift` and pin your favourite random pattern with `--seed` parameters:
+![](https://raw.githubusercontent.com/wiki/ManeFunction/caelestia-hexwall/big-hex.png)
+
 ## Features
 
 - **Hexagonal grid** with light running along the hex edges, in greys with black accents. The pattern is new at
