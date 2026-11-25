@@ -18,6 +18,7 @@ layout(location = 3) FLAT out vec3 lineCol;
 layout(location = 4) FLAT out vec3 glowCol;
 layout(location = 5) FLAT out vec4 kc;     // dark-hex shade, vignette * opacity, line ramp scale and offset
 layout(location = 6) FLAT out vec3 kg;     // glow falloff constants and its edge limit, in cell units
+layout(location = 7) FLAT out vec4 kd;     // dither: pattern steps per vig unit (one per device pixel), scale, offset
 
 // must match hexgrid.frag
 layout(std140, binding = 0) uniform buf {
@@ -28,6 +29,7 @@ layout(std140, binding = 0) uniform buf {
     float cell;
     float lightMix; // 0 = dark theme, 1 = light theme
     vec2 res;
+    float dpr;      // device pixels per logical pixel
 } ubuf;
 
 void main() {
@@ -50,6 +52,8 @@ void main() {
     // the fragment shader measures the edge distance w in cells; in pixels it is e = w * cell
     kc = vec4(mix(0.35, 0.68, lm), mix(0.3, 0.12, lm) * ubuf.qt_Opacity, c / 1.1, 0.5 / 1.1);
     kg = vec3(0.48 * c * c, 0.206 * c, 28.0 / c);
+    // R2 sequence on device pixels: fract(x * 0.7548777 + y * 0.5698403), offsets from -1/2 to +1/2 of a level
+    kd = vec4(ubuf.res * ubuf.dpr * vec2(0.7548777, 0.5698403), ubuf.qt_Opacity / 255.0, -0.5 * ubuf.qt_Opacity / 255.0);
 
     gl_Position = ubuf.qt_Matrix * qt_Vertex;
 }

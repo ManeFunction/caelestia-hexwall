@@ -52,6 +52,8 @@ Item {
         property real cell: 64 * root.size
         property real lightMix: root.lightMix
         property size res: Qt.size(width, height)
+        // the dither pattern works on device pixels (1.6 per logical pixel at 160% scale)
+        property real dpr: (QsWindow.window as QsWindow)?.devicePixelRatio ?? 1
 
         vertexShader: Qt.resolvedUrl("hexgrid.vert.qsb")
         fragmentShader: Qt.resolvedUrl("hexgrid.frag.qsb")

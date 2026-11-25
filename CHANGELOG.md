@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - After about a day of accumulated animation the light froze (or jumped around) while the wallpaper kept
   redrawing: the shader got the time as one big float. The animation phases are now wrapped before they reach it.
+- No more visible bands inside the hexes where the dark gradient steps from one colour level to the next: the
+  output is dithered by less than one level (about 3% more GPU time).
 
 ## [1.0.0] - 2026-11-19
 ### Changed

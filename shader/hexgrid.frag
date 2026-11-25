@@ -12,6 +12,7 @@ layout(location = 3) FLAT in vec3 lineCol;
 layout(location = 4) FLAT in vec3 glowCol;
 layout(location = 5) FLAT in vec4 kc;
 layout(location = 6) FLAT in vec3 kg;
+layout(location = 7) FLAT in vec4 kd;
 layout(location = 0) out vec4 fragColor;
 
 // must match hexgrid.vert
@@ -23,6 +24,7 @@ layout(std140, binding = 0) uniform buf {
     float cell;
     float lightMix;
     vec2 res;
+    float dpr;
 } ubuf;
 
 void main() {
@@ -71,6 +73,9 @@ void main() {
         }
     }
 
-    // soft vignette
-    fragColor = vec4(col * (ubuf.qt_Opacity - kc.y * length(vig)), ubuf.qt_Opacity);
+    // soft vignette, then dither: a fixed per-pixel offset of under one 8-bit level mixes neighbouring levels, so
+    // the dark gradients show no bands where they step from one level to the next. The pixel position comes from
+    // vig, which is interpolated anyway (cheaper than gl_FragCoord).
+    float n = fract(dot(vig, kd.xy));
+    fragColor = vec4(col * (ubuf.qt_Opacity - kc.y * length(vig)) + (n * kd.z + kd.w), ubuf.qt_Opacity);
 }
