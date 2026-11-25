@@ -48,6 +48,7 @@ hexwall activate                  # add the wallpaper
 hexwall activate --theme dark     # force the dark palette
 hexwall activate --animate on     # animate on battery too
 hexwall activate --size 2         # hexes twice as big
+hexwall activate --shift 0.5      # the whole pattern half a hex lower
 hexwall activate --seed 41234     # keep one pattern instead of a new one at every launch
 hexwall status                    # is it active, with which options and which seed
 hexwall deactivate                # disable hexwall
@@ -58,6 +59,8 @@ hexwall deactivate                # disable hexwall
   mode and behind fullscreen windows). Default: `auto`.
 - `--size`: hex size, from `0.25` to `8` (`1.5` works too). `2` makes the hexes twice as big; the lines and the
   light keep their width. Default: `1`.
+- `--shift`: moves the whole pattern down by a part of a hex height, from `0` to `1` (one whole hex), e.g. `0.5`.
+  Default: `0`.
 - `--seed`: the hex pattern. `random` picks a new one at every launch, a different one on each monitor. A number
   from `0` to `65535` keeps that pattern on every monitor, through restarts and reboots. Default: `random`.
   `hexwall status` shows the seed in use (`seed: random, now 41234 on eDP-1`), so you can keep a pattern you like.

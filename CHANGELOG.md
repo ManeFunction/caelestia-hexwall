@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 - `--size` sets the hex size: `hexwall activate --size 2` makes the hexes twice as big (from 0.25 to 8, default 1).
+- `--shift N` moves the whole pattern down by a part of a hex height, from 0 to 1 (one whole hex).
 - `--seed N` keeps one hex pattern, from 0 to 65535, through restarts and reboots; `random` (the default) picks a
   new one at every launch. `hexwall status` shows the seed in use, so a pattern you like can be kept.
 

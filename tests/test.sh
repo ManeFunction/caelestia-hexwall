@@ -62,13 +62,14 @@ check "activate twice does not duplicate" '[ "$(grep -c "caelestia-hexwall:begin
 
 check "default options are auto" '"$TOOL" status --shell-dir "$SH" | grep -q "theme: auto" && "$TOOL" status --shell-dir "$SH" | grep -q "animate: auto"'
 check "default size is 1" 'grep -qE "^ +size: 1$" "$BG" && "$TOOL" status --shell-dir "$SH" | grep -qx "size: 1"'
+check "default shift is 0" 'grep -qE "^ +shift: 0$" "$BG" && "$TOOL" status --shell-dir "$SH" | grep -qx "shift: 0"'
 check "default seed is random" 'grep -qE "^ +seed: -1$" "$BG" && "$TOOL" status --shell-dir "$SH" | grep -qx "seed: random"'
-"$TOOL" activate --theme light --animate off --size 1.5 --shell-dir "$SH" >/dev/null
-check "theme, animate and size are written" 'grep -q "theme: \"light\"" "$BG" && grep -q "animation: \"off\"" "$BG" && grep -qE "^ +size: 1.5$" "$BG"'
-check "status shows them" '"$TOOL" status --shell-dir "$SH" | grep -q "theme: light" && "$TOOL" status --shell-dir "$SH" | grep -q "animate: off" && "$TOOL" status --shell-dir "$SH" | grep -qx "size: 1.5"'
+"$TOOL" activate --theme light --animate off --size 1.5 --shift 0.5 --shell-dir "$SH" >/dev/null
+check "theme, animate, size and shift are written" 'grep -q "theme: \"light\"" "$BG" && grep -q "animation: \"off\"" "$BG" && grep -qE "^ +size: 1.5$" "$BG" && grep -qE "^ +shift: 0.5$" "$BG"'
+check "status shows them" '"$TOOL" status --shell-dir "$SH" | grep -q "theme: light" && "$TOOL" status --shell-dir "$SH" | grep -q "animate: off" && "$TOOL" status --shell-dir "$SH" | grep -qx "size: 1.5" && "$TOOL" status --shell-dir "$SH" | grep -qx "shift: 0.5"'
 "$TOOL" activate --shell-dir "$SH" >/dev/null
-check "options not given go back to the defaults" 'grep -q "theme: \"auto\"" "$BG" && grep -q "animation: \"auto\"" "$BG" && grep -qE "^ +size: 1$" "$BG"'
-check "options are not duplicated" '[ "$(grep -c "theme:" "$BG")" = 1 ] && [ "$(grep -c "size:" "$BG")" = 1 ]'
+check "options not given go back to the defaults" 'grep -q "theme: \"auto\"" "$BG" && grep -q "animation: \"auto\"" "$BG" && grep -qE "^ +size: 1$" "$BG" && grep -qE "^ +shift: 0$" "$BG"'
+check "options are not duplicated" '[ "$(grep -c "theme:" "$BG")" = 1 ] && [ "$(grep -c "size:" "$BG")" = 1 ] && [ "$(grep -c "shift:" "$BG")" = 1 ]'
 if "$TOOL" activate --style hex --shell-dir "$SH" >/dev/null 2>&1; then bad "--style option is gone"; else ok "--style option is gone"; fi
 if "$TOOL" activate --theme blue --shell-dir "$SH" >/dev/null 2>&1; then bad "unknown theme is rejected"; else ok "unknown theme is rejected"; fi
 if "$TOOL" activate --animate maybe --shell-dir "$SH" >/dev/null 2>&1; then bad "unknown animate value is rejected"; else ok "unknown animate value is rejected"; fi
@@ -80,6 +81,17 @@ for s in 0.25 8 2; do "$TOOL" activate --size "$s" --shell-dir "$SH" >/dev/null 
 check "sizes at the limits are accepted" 'grep -qE "^ +size: 2$" "$BG"'
 sed -i '/^ *size: /d' "$BG"
 check "a block from before --size reports size 1" '"$TOOL" status --shell-dir "$SH" | grep -qx "size: 1"'
+"$TOOL" activate --shell-dir "$SH" >/dev/null
+
+"$TOOL" activate --shift 0.5 --shell-dir "$SH" >/dev/null
+for s in -0.5 1.01 2 abc .5 01 1. 0,5 "0; color: 1" ""; do
+    if "$TOOL" activate --shift "$s" --shell-dir "$SH" >/dev/null 2>&1; then bad "shift '$s' is rejected"; else ok "shift '$s' is rejected"; fi
+done
+check "a rejected shift leaves the block alone" 'grep -qE "^ +shift: 0.5$" "$BG"'
+for s in 0 1 0.25; do "$TOOL" activate --shift "$s" --shell-dir "$SH" >/dev/null || bad "shift $s is accepted"; done
+check "shifts at the limits are accepted" 'grep -qE "^ +shift: 0.25$" "$BG"'
+sed -i '/^ *shift: /d' "$BG"
+check "a block from before --shift reports shift 0" '"$TOOL" status --shell-dir "$SH" | grep -qx "shift: 0"'
 "$TOOL" activate --shell-dir "$SH" >/dev/null
 
 "$TOOL" activate --seed 1234 --shell-dir "$SH" >/dev/null
@@ -123,10 +135,10 @@ if "$TOOL" activate --shell-dir "$TMP/nothing" >/dev/null 2>&1; then bad "missin
 
 # installer script: install, apply, uninstall everything
 PFX="$TMP/prefix"; SH2="$TMP/shell2"; fake_shell "$SH2"
-"$ROOT/install.sh" --prefix "$PFX" --shell-dir "$SH2" --size 2 --seed 42 >/dev/null
+"$ROOT/install.sh" --prefix "$PFX" --shell-dir "$SH2" --size 2 --shift 0.5 --seed 42 >/dev/null
 check "install.sh installs the tool" '[ -x "$PFX/bin/hexwall" ] && [ -f "$PFX/share/caelestia-hexwall/HexWallpaper.qml" ]'
 check "install.sh applies it" 'grep -q "sourceComponent: HexWallpaper {" "$SH2/modules/background/Background.qml"'
-check "install.sh passes --size and --seed on" 'grep -qE "^ +size: 2$" "$SH2/modules/background/Background.qml" && grep -qE "^ +seed: 42$" "$SH2/modules/background/Background.qml"'
+check "install.sh passes --size, --shift and --seed on" 'grep -qE "^ +size: 2$" "$SH2/modules/background/Background.qml" && grep -qE "^ +shift: 0.5$" "$SH2/modules/background/Background.qml" && grep -qE "^ +seed: 42$" "$SH2/modules/background/Background.qml"'
 check "installed tool finds its data" '"$PFX/bin/hexwall" status --shell-dir "$SH2" | grep -q "active: yes"'
 "$ROOT/install.sh" --uninstall --prefix "$PFX" --shell-dir "$SH2" >/dev/null
 check "install.sh --deactivate removes tool and wallpaper" '[ ! -e "$PFX/bin/hexwall" ] && [ ! -d "$PFX/share/caelestia-hexwall" ] && ! grep -q "caelestia-hexwall" "$SH2/modules/background/Background.qml"'

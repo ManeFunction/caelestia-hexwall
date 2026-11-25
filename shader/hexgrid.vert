@@ -31,6 +31,7 @@ layout(std140, binding = 0) uniform buf {
     vec2 res;
     float dpr;      // device pixels per logical pixel
     float seed;     // hex pattern, a whole number from 0 to 65535
+    float shift;    // moves the grid down, in hex heights (0 to 1)
 } ubuf;
 
 void main() {
@@ -38,8 +39,9 @@ void main() {
     float lm = ubuf.lightMix;
     float c = ubuf.cell;
 
-    // hex lattice (flat-top hexes, neighbour spacing 1), shifted right by about 0.3 of the grid spacing
-    vec2 p = uv * ubuf.res / c - vec2(0.316, 0.0);
+    // hex lattice (flat-top hexes, neighbour spacing 1 = one hex height), shifted right by about 0.3 of the grid
+    // spacing and down by `shift` hex heights
+    vec2 p = uv * ubuf.res / c - vec2(0.316, ubuf.shift);
     float u = p.x * 1.1547005;
     // The seed moves the axial coordinates by whole hexes, 0 to 255 each way: the hexes stay where they are but
     // get other ids, so the hash in hexgrid.frag gives them other shades and timings, at no cost per pixel.

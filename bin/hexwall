@@ -12,6 +12,8 @@ SYSTEM_SHELL="/etc/xdg/quickshell/caelestia"
 FILES=(HexWallpaper.qml hexgrid.vert.qsb hexgrid.frag.qsb)
 SIZE_MIN="0.25"
 SIZE_MAX="8"
+SHIFT_MIN="0"
+SHIFT_MAX="1"
 SEED_MAX="65535"
 
 die() { echo "$NAME: $*" >&2; exit 1; }
@@ -21,8 +23,8 @@ usage() {
 $NAME v$VERSION: animated hexagonal wallpaper for the Caelestia shell
 
 Usage:
-  $NAME activate [--theme light|dark|auto] [--animate on|off|auto] [--size N] [--seed N|random]
-                  [--shell-dir DIR] [--no-restart]
+  $NAME activate [--theme light|dark|auto] [--animate on|off|auto] [--size N] [--shift N]
+                  [--seed N|random] [--shell-dir DIR] [--no-restart]
   $NAME deactivate [--shell-dir DIR] [--no-restart]
   $NAME status [--shell-dir DIR]
   $NAME --version (-v) | --help (-h)
@@ -30,6 +32,7 @@ Usage:
 Theme:   auto (default, follows the Caelestia light/dark mode), light, dark.
 Animate: auto (default, animates on AC power, freezes on battery and in game mode), on (always), off (never).
 Size:    hex size, 1 (default); 2 makes the hexes twice as big. From $SIZE_MIN to $SIZE_MAX, e.g. 1.5.
+Shift:   moves the whole pattern down by a part of a hex height: $SHIFT_MIN (default) to $SHIFT_MAX (a whole hex), e.g. 0.5.
 Seed:    hex pattern: random (default, a new one at every launch), or a number from 0 to $SEED_MAX to keep one.
          status shows the one in use.
 
@@ -58,6 +61,7 @@ shell_dir=""
 theme="auto"
 animate="auto"
 size="1"
+grid_shift="0"
 seed="random"
 restart=1
 
@@ -67,6 +71,7 @@ parse_opts() {
             --theme) [ $# -ge 2 ] || die "--theme needs a value"; theme="$2"; shift 2 ;;
             --animate) [ $# -ge 2 ] || die "--animate needs a value"; animate="$2"; shift 2 ;;
             --size) [ $# -ge 2 ] || die "--size needs a value"; size="$2"; shift 2 ;;
+            --shift) [ $# -ge 2 ] || die "--shift needs a value"; grid_shift="$2"; shift 2 ;;
             --seed) [ $# -ge 2 ] || die "--seed needs a value"; seed="$2"; shift 2 ;;
             --shell-dir) [ $# -ge 2 ] || die "--shell-dir needs a value"; shell_dir="$2"; shift 2 ;;
             --no-restart) restart=0; shift ;;
@@ -74,6 +79,12 @@ parse_opts() {
         esac
     done
     shell_dir="${shell_dir:-${CAELESTIA_SHELL_DIR:-$HOME/.config/quickshell/caelestia}}"
+}
+
+# A plain decimal from $2 to $3 (it goes into the QML as is), compared in the C locale so 1.5 never reads as 1,5.
+decimal_in() {
+    [[ "$1" =~ ^(0|[1-9][0-9]*)(\.[0-9]+)?$ ]] \
+        && LC_ALL=C awk -v s="$1" -v lo="$2" -v hi="$3" 'BEGIN { exit !(s >= lo && s <= hi) }'
 }
 
 background_qml() { echo "$shell_dir/modules/background/Background.qml"; }
@@ -114,11 +125,10 @@ cmd_activate() {
     parse_opts "$@"
     case "$theme" in light|dark|auto) ;; *) die "unknown theme: $theme (light, dark or auto)" ;; esac
     case "$animate" in on|off|auto) ;; *) die "unknown animate value: $animate (on, off or auto)" ;; esac
-    # a plain decimal (it goes into the QML as is), compared in the C locale so 1.5 never reads as 1,5
-    if ! [[ "$size" =~ ^(0|[1-9][0-9]*)(\.[0-9]+)?$ ]] \
-        || ! LC_ALL=C awk -v s="$size" -v lo="$SIZE_MIN" -v hi="$SIZE_MAX" 'BEGIN { exit !(s >= lo && s <= hi) }'; then
-        die "invalid size: $size (a number from $SIZE_MIN to $SIZE_MAX, like 2 or 1.5)"
-    fi
+    decimal_in "$size" "$SIZE_MIN" "$SIZE_MAX" \
+        || die "invalid size: $size (a number from $SIZE_MIN to $SIZE_MAX, like 2 or 1.5)"
+    decimal_in "$grid_shift" "$SHIFT_MIN" "$SHIFT_MAX" \
+        || die "invalid shift: $grid_shift (a number from $SHIFT_MIN to $SHIFT_MAX, like 0.5)"
     # random, or a pattern number (it goes into the QML as is; -1 there means random)
     if [ "$seed" != random ] && { ! [[ "$seed" =~ ^(0|[1-9][0-9]{0,4})$ ]] || [ "$seed" -gt "$SEED_MAX" ]; }; then
         die "invalid seed: $seed (random, or a whole number from 0 to $SEED_MAX)"
@@ -159,6 +169,7 @@ cmd_activate() {
                     theme: \"$theme\"
                     animation: \"$animate\"
                     size: $size
+                    shift: $grid_shift
                     seed: $qml_seed
                 }
             }
@@ -196,18 +207,19 @@ seeds_in_use() {
     if [ -n "$list" ]; then echo ", now ${list#, }"; fi
 }
 
-# Theme, animate, size and seed read back from the inserted block (blocks from before --size or --seed have none:
-# 1 and random). With a random seed, the ones in use now are added.
+# The settings read back from the inserted block; older blocks lack the newer ones, which read as their defaults
+# (size 1, shift 0, seed random). With a random seed, the ones in use now are added.
 without_markers_info() {
     awk -v b="$MARK_BEGIN" -v e="$MARK_END" -v now="$(seeds_in_use)" '
-        BEGIN { size = "1"; seed = "-1" }
+        BEGIN { size = "1"; shift = "0"; seed = "-1" }
         index($0, b) { on = 1 }
         on && /theme:/ { gsub(/"/, "", $2); print "theme: " $2 }
         on && /animation:/ { gsub(/"/, "", $2); print "animate: " $2 }
         on && /size:/ { size = $2 }
+        on && /shift:/ { shift = $2 }
         on && /seed:/ { seed = $2 }
         index($0, e) { on = 0 }
-        END { print "size: " size; print "seed: " ((seed == "-1") ? ("random" now) : seed) }
+        END { print "size: " size; print "shift: " shift; print "seed: " ((seed == "-1") ? ("random" now) : seed) }
     ' "$(background_qml)"
 }
 

@@ -26,6 +26,7 @@ layout(std140, binding = 0) uniform buf {
     vec2 res;
     float dpr;
     float seed;
+    float shift;
 } ubuf;
 
 void main() {
