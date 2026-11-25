@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ## [1.2.0] - 2026-11-25
+**Multi-monitor support is here!**
+
 ### Added
 - `--config FILE` takes the options from a text file (`key = value` lines with the same names as the flags:
   `theme`, `animate`, `size`, `shift`, `seed`, `shell-dir`, `no-restart`). Flags on the command line win over it.
