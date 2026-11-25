@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [1.1.0] - 2026-11-25
 ### Added
 - `--size` sets the hex size: `hexwall activate --size 2` makes the hexes twice as big (from 0.25 to 8, default 1).
 - `--shift N` moves the whole pattern down by a part of a hex height, from 0 to 1 (one whole hex).
