@@ -12,6 +12,9 @@ mkdir -p "$TMP/stub"
 printf '#!/bin/sh\necho "$@" >> "%s/caelestia.log"\n' "$TMP" > "$TMP/stub/caelestia"
 chmod +x "$TMP/stub/caelestia"
 export PATH="$TMP/stub:$PATH"
+# where the running wallpaper leaves the seeds it picked; never the real one
+export XDG_RUNTIME_DIR="$TMP/run"
+mkdir -p "$XDG_RUNTIME_DIR"
 fails=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fails=$((fails + 1)); }
@@ -59,6 +62,7 @@ check "activate twice does not duplicate" '[ "$(grep -c "caelestia-hexwall:begin
 
 check "default options are auto" '"$TOOL" status --shell-dir "$SH" | grep -q "theme: auto" && "$TOOL" status --shell-dir "$SH" | grep -q "animate: auto"'
 check "default size is 1" 'grep -qE "^ +size: 1$" "$BG" && "$TOOL" status --shell-dir "$SH" | grep -qx "size: 1"'
+check "default seed is random" 'grep -qE "^ +seed: -1$" "$BG" && "$TOOL" status --shell-dir "$SH" | grep -qx "seed: random"'
 "$TOOL" activate --theme light --animate off --size 1.5 --shell-dir "$SH" >/dev/null
 check "theme, animate and size are written" 'grep -q "theme: \"light\"" "$BG" && grep -q "animation: \"off\"" "$BG" && grep -qE "^ +size: 1.5$" "$BG"'
 check "status shows them" '"$TOOL" status --shell-dir "$SH" | grep -q "theme: light" && "$TOOL" status --shell-dir "$SH" | grep -q "animate: off" && "$TOOL" status --shell-dir "$SH" | grep -qx "size: 1.5"'
@@ -78,6 +82,32 @@ sed -i '/^ *size: /d' "$BG"
 check "a block from before --size reports size 1" '"$TOOL" status --shell-dir "$SH" | grep -qx "size: 1"'
 "$TOOL" activate --shell-dir "$SH" >/dev/null
 
+"$TOOL" activate --seed 1234 --shell-dir "$SH" >/dev/null
+"$TOOL" activate --seed 1234 --shell-dir "$SH" >/dev/null
+check "--seed is written and shown" 'grep -qE "^ +seed: 1234$" "$BG" && "$TOOL" status --shell-dir "$SH" | grep -qx "seed: 1234"'
+check "seed is not duplicated" '[ "$(grep -c "seed:" "$BG")" = 1 ]'
+for s in -1 65536 99999 123456 abc 1.5 01 00 0x10 " 1" "1; color: 2" ""; do
+    if "$TOOL" activate --seed "$s" --shell-dir "$SH" >/dev/null 2>&1; then bad "seed '$s' is rejected"; else ok "seed '$s' is rejected"; fi
+done
+check "a rejected seed leaves the block alone" 'grep -qE "^ +seed: 1234$" "$BG"'
+for s in 0 65535; do "$TOOL" activate --seed "$s" --shell-dir "$SH" >/dev/null || bad "seed $s is accepted"; done
+check "seeds at the limits are accepted" 'grep -qE "^ +seed: 65535$" "$BG"'
+"$TOOL" activate --seed random --shell-dir "$SH" >/dev/null
+check "--seed random goes back to a random seed" 'grep -qE "^ +seed: -1$" "$BG"'
+# the running wallpaper writes the seed it picked, one file per monitor
+mkdir -p "$XDG_RUNTIME_DIR/caelestia-hexwall"
+echo 41234 > "$XDG_RUNTIME_DIR/caelestia-hexwall/DP-1.seed"
+check "status shows the random seed in use" '"$TOOL" status --shell-dir "$SH" | grep -qx "seed: random, now 41234 on DP-1"'
+echo 517 > "$XDG_RUNTIME_DIR/caelestia-hexwall/DP-2.seed"
+echo "oops" > "$XDG_RUNTIME_DIR/caelestia-hexwall/DP-3.seed"
+check "status lists every monitor and skips broken files" '"$TOOL" status --shell-dir "$SH" | grep -qx "seed: random, now 41234 on DP-1, 517 on DP-2"'
+"$TOOL" activate --seed 7 --shell-dir "$SH" >/dev/null
+check "a set seed is shown as set" '"$TOOL" status --shell-dir "$SH" | grep -qx "seed: 7"'
+sed -i '/^ *seed: /d' "$BG"
+check "a block from before --seed reports a random seed" '"$TOOL" status --shell-dir "$SH" | grep -q "^seed: random"'
+rm -r "$XDG_RUNTIME_DIR/caelestia-hexwall"
+"$TOOL" activate --shell-dir "$SH" >/dev/null
+
 check "status reports it" '"$TOOL" status --shell-dir "$SH" | grep -q "active: yes"'
 "$TOOL" deactivate --shell-dir "$SH" >/dev/null
 check "deactivate restores Background.qml exactly" 'cmp -s "$BG" "$TMP/orig.qml"'
@@ -93,10 +123,10 @@ if "$TOOL" activate --shell-dir "$TMP/nothing" >/dev/null 2>&1; then bad "missin
 
 # installer script: install, apply, uninstall everything
 PFX="$TMP/prefix"; SH2="$TMP/shell2"; fake_shell "$SH2"
-"$ROOT/install.sh" --prefix "$PFX" --shell-dir "$SH2" --size 2 >/dev/null
+"$ROOT/install.sh" --prefix "$PFX" --shell-dir "$SH2" --size 2 --seed 42 >/dev/null
 check "install.sh installs the tool" '[ -x "$PFX/bin/hexwall" ] && [ -f "$PFX/share/caelestia-hexwall/HexWallpaper.qml" ]'
 check "install.sh applies it" 'grep -q "sourceComponent: HexWallpaper {" "$SH2/modules/background/Background.qml"'
-check "install.sh passes --size on" 'grep -qE "^ +size: 2$" "$SH2/modules/background/Background.qml"'
+check "install.sh passes --size and --seed on" 'grep -qE "^ +size: 2$" "$SH2/modules/background/Background.qml" && grep -qE "^ +seed: 42$" "$SH2/modules/background/Background.qml"'
 check "installed tool finds its data" '"$PFX/bin/hexwall" status --shell-dir "$SH2" | grep -q "active: yes"'
 "$ROOT/install.sh" --uninstall --prefix "$PFX" --shell-dir "$SH2" >/dev/null
 check "install.sh --deactivate removes tool and wallpaper" '[ ! -e "$PFX/bin/hexwall" ] && [ ! -d "$PFX/share/caelestia-hexwall" ] && ! grep -q "caelestia-hexwall" "$SH2/modules/background/Background.qml"'

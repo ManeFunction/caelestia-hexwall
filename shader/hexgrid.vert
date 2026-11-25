@@ -30,6 +30,7 @@ layout(std140, binding = 0) uniform buf {
     float lightMix; // 0 = dark theme, 1 = light theme
     vec2 res;
     float dpr;      // device pixels per logical pixel
+    float seed;     // hex pattern, a whole number from 0 to 65535
 } ubuf;
 
 void main() {
@@ -40,7 +41,9 @@ void main() {
     // hex lattice (flat-top hexes, neighbour spacing 1), shifted right by about 0.3 of the grid spacing
     vec2 p = uv * ubuf.res / c - vec2(0.316, 0.0);
     float u = p.x * 1.1547005;
-    ax = vec2(u, p.y - 0.5 * u);
+    // The seed moves the axial coordinates by whole hexes, 0 to 255 each way: the hexes stay where they are but
+    // get other ids, so the hash in hexgrid.frag gives them other shades and timings, at no cost per pixel.
+    ax = vec2(u, p.y - 0.5 * u) + vec2(floor(ubuf.seed / 256.0), mod(ubuf.seed, 256.0));
     vig = uv - 0.5;
 
     vec3 top = mix(vec3(0.135, 0.135, 0.150), vec3(0.90, 0.90, 0.92), lm);

@@ -12,6 +12,7 @@ SYSTEM_SHELL="/etc/xdg/quickshell/caelestia"
 FILES=(HexWallpaper.qml hexgrid.vert.qsb hexgrid.frag.qsb)
 SIZE_MIN="0.25"
 SIZE_MAX="8"
+SEED_MAX="65535"
 
 die() { echo "$NAME: $*" >&2; exit 1; }
 
@@ -20,7 +21,8 @@ usage() {
 $NAME v$VERSION: animated hexagonal wallpaper for the Caelestia shell
 
 Usage:
-  $NAME activate [--theme light|dark|auto] [--animate on|off|auto] [--size N] [--shell-dir DIR] [--no-restart]
+  $NAME activate [--theme light|dark|auto] [--animate on|off|auto] [--size N] [--seed N|random]
+                  [--shell-dir DIR] [--no-restart]
   $NAME deactivate [--shell-dir DIR] [--no-restart]
   $NAME status [--shell-dir DIR]
   $NAME --version (-v) | --help (-h)
@@ -28,6 +30,8 @@ Usage:
 Theme:   auto (default, follows the Caelestia light/dark mode), light, dark.
 Animate: auto (default, animates on AC power, freezes on battery and in game mode), on (always), off (never).
 Size:    hex size, 1 (default); 2 makes the hexes twice as big. From $SIZE_MIN to $SIZE_MAX, e.g. 1.5.
+Seed:    hex pattern: random (default, a new one at every launch), or a number from 0 to $SEED_MAX to keep one.
+         status shows the one in use.
 
 Every activate sets all options; the ones you leave out go back to their defaults.
 
@@ -54,6 +58,7 @@ shell_dir=""
 theme="auto"
 animate="auto"
 size="1"
+seed="random"
 restart=1
 
 parse_opts() {
@@ -62,6 +67,7 @@ parse_opts() {
             --theme) [ $# -ge 2 ] || die "--theme needs a value"; theme="$2"; shift 2 ;;
             --animate) [ $# -ge 2 ] || die "--animate needs a value"; animate="$2"; shift 2 ;;
             --size) [ $# -ge 2 ] || die "--size needs a value"; size="$2"; shift 2 ;;
+            --seed) [ $# -ge 2 ] || die "--seed needs a value"; seed="$2"; shift 2 ;;
             --shell-dir) [ $# -ge 2 ] || die "--shell-dir needs a value"; shell_dir="$2"; shift 2 ;;
             --no-restart) restart=0; shift ;;
             *) die "unknown option: $1 (see --help)" ;;
@@ -113,6 +119,12 @@ cmd_activate() {
         || ! LC_ALL=C awk -v s="$size" -v lo="$SIZE_MIN" -v hi="$SIZE_MAX" 'BEGIN { exit !(s >= lo && s <= hi) }'; then
         die "invalid size: $size (a number from $SIZE_MIN to $SIZE_MAX, like 2 or 1.5)"
     fi
+    # random, or a pattern number (it goes into the QML as is; -1 there means random)
+    if [ "$seed" != random ] && { ! [[ "$seed" =~ ^(0|[1-9][0-9]{0,4})$ ]] || [ "$seed" -gt "$SEED_MAX" ]; }; then
+        die "invalid seed: $seed (random, or a whole number from 0 to $SEED_MAX)"
+    fi
+    local qml_seed="$seed"
+    if [ "$seed" = random ]; then qml_seed=-1; fi
 
     local data
     data="$(data_dir)"
@@ -147,6 +159,7 @@ cmd_activate() {
                     theme: \"$theme\"
                     animation: \"$animate\"
                     size: $size
+                    seed: $qml_seed
                 }
             }
             $MARK_END
@@ -170,16 +183,31 @@ cmd_deactivate() {
     maybe_restart
 }
 
-# Theme, animate and size settings read back from the inserted block (blocks from before --size have no size: 1).
+# The seeds the running wallpaper picked when it last loaded, one file per monitor (written by HexWallpaper.qml;
+# the folder is emptied at logout), as ", now 41234 on eDP-1, 517 on HDMI-A-1". Nothing when there are none.
+seeds_in_use() {
+    local dir="${XDG_RUNTIME_DIR:-}/caelestia-hexwall" f n list=""
+    if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$dir" ]; then return 0; fi
+    for f in "$dir"/*.seed; do
+        [ -f "$f" ] || continue
+        n="$(head -c 32 "$f" | tr -d '[:space:]')"
+        if [[ "$n" =~ ^[0-9]{1,5}$ ]]; then list="$list, $n on $(basename "$f" .seed)"; fi
+    done
+    if [ -n "$list" ]; then echo ", now ${list#, }"; fi
+}
+
+# Theme, animate, size and seed read back from the inserted block (blocks from before --size or --seed have none:
+# 1 and random). With a random seed, the ones in use now are added.
 without_markers_info() {
-    awk -v b="$MARK_BEGIN" -v e="$MARK_END" '
-        BEGIN { size = "1" }
+    awk -v b="$MARK_BEGIN" -v e="$MARK_END" -v now="$(seeds_in_use)" '
+        BEGIN { size = "1"; seed = "-1" }
         index($0, b) { on = 1 }
         on && /theme:/ { gsub(/"/, "", $2); print "theme: " $2 }
         on && /animation:/ { gsub(/"/, "", $2); print "animate: " $2 }
         on && /size:/ { size = $2 }
+        on && /seed:/ { seed = $2 }
         index($0, e) { on = 0 }
-        END { print "size: " size }
+        END { print "size: " size; print "seed: " ((seed == "-1") ? ("random" now) : seed) }
     ' "$(background_qml)"
 }
 

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Services.UPower
 import qs.services
 
@@ -13,10 +14,39 @@ Item {
     // seconds of animation; the clock only advances while animating
     property real t: 0
     // Set by `hexwall activate`: theme "auto" | "light" | "dark", animation "auto" | "on" | "off",
-    // size: hex size multiplier (1 = hexes 64 px apart; lines and glow keep their width in pixels)
+    // size: hex size multiplier (1 = hexes 64 px apart; lines and glow keep their width in pixels),
+    // seed: hex pattern from 0 to 65535, or -1 for a random one at every launch
     property string theme: "auto"
     property string animation: "auto"
     property real size: 1
+    property int seed: -1
+
+    // The pattern shown (which hexes are lighter, darker or black, and when each one lights up): the set seed,
+    // or a random one picked when the wallpaper loads, so each monitor gets its own
+    readonly property int currentSeed: seed >= 0 ? seed : Math.floor(Math.random() * 65536)
+
+    // `hexwall status` reads the seed in use from $XDG_RUNTIME_DIR/caelestia-hexwall/<monitor>.seed
+    // (emptied at logout, like the random seeds it holds)
+    readonly property string seedPath: {
+        const dir = Quickshell.env("XDG_RUNTIME_DIR");
+        const name = (QsWindow.window as QsWindow)?.screen?.name ?? "";
+        return dir && name ? `${dir}/caelestia-hexwall/${name}.seed` : "";
+    }
+    onSeedPathChanged: saveSeed()
+    Component.onCompleted: saveSeed()
+
+    function saveSeed(): void {
+        if (!seedPath)
+            return;
+        seedFile.path = seedPath;
+        seedFile.setText(`${currentSeed}\n`);
+    }
+
+    FileView {
+        id: seedFile
+        preload: false
+        blockWrites: true
+    }
 
     // follows the Caelestia light/dark mode (unless forced), with a short fade
     readonly property bool isLight: theme === "light" || (theme === "auto" && Colours.light)
@@ -54,6 +84,7 @@ Item {
         property size res: Qt.size(width, height)
         // the dither pattern works on device pixels (1.6 per logical pixel at 160% scale)
         property real dpr: (QsWindow.window as QsWindow)?.devicePixelRatio ?? 1
+        property real seed: root.currentSeed
 
         vertexShader: Qt.resolvedUrl("hexgrid.vert.qsb")
         fragmentShader: Qt.resolvedUrl("hexgrid.frag.qsb")

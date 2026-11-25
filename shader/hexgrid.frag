@@ -25,6 +25,7 @@ layout(std140, binding = 0) uniform buf {
     float lightMix;
     vec2 res;
     float dpr;
+    float seed;
 } ubuf;
 
 void main() {
@@ -42,7 +43,8 @@ void main() {
     vec2 aq = abs(q);
     float w = 0.5 - max(dot(aq, vec2(0.8660254, 0.5)), aq.y);
 
-    // sin-free hash, three random values per hex; only the first one is needed for every pixel
+    // sin-free hash, three random values per hex; only the first one is needed for every pixel.
+    // The ids depend on the seed (see hexgrid.vert), which picks the pattern.
     vec3 p3 = fract(id.xyx * vec3(0.1031, 0.1030, 0.0973));
     p3 += dot(p3, p3.yxz + 33.33);
     float h1 = fract((p3.x + p3.y) * p3.z);

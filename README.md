@@ -13,7 +13,8 @@ Made with a tiny shader patched right to your shell.
 
 ## Features
 
-- **Hexagonal grid** with light running along the hex edges, in greys with black accents.
+- **Hexagonal grid** with light running along the hex edges, in greys with black accents. The pattern is new at
+  every launch, or the one you keep with `--seed`.
 - **Power aware:** by default it animates (about 30 fps) only on AC power and freezes the picture as it is on
   battery, while Caelestia's game mode is on, or while a window is fullscreen on that monitor. `--animate on|off` overrides that.
 - **Follows the theme:** by default it switches between light and dark palettes when Caelestia is in light or dark mode accordingly.
@@ -47,7 +48,8 @@ hexwall activate                  # add the wallpaper
 hexwall activate --theme dark     # force the dark palette
 hexwall activate --animate on     # animate on battery too
 hexwall activate --size 2         # hexes twice as big
-hexwall status                    # is it active, with which options
+hexwall activate --seed 41234     # keep one pattern instead of a new one at every launch
+hexwall status                    # is it active, with which options and which seed
 hexwall deactivate                # disable hexwall
 ```
 
@@ -56,6 +58,9 @@ hexwall deactivate                # disable hexwall
   mode and behind fullscreen windows). Default: `auto`.
 - `--size`: hex size, from `0.25` to `8` (`1.5` works too). `2` makes the hexes twice as big; the lines and the
   light keep their width. Default: `1`.
+- `--seed`: the hex pattern. `random` picks a new one at every launch, a different one on each monitor. A number
+  from `0` to `65535` keeps that pattern on every monitor, through restarts and reboots. Default: `random`.
+  `hexwall status` shows the seed in use (`seed: random, now 41234 on eDP-1`), so you can keep a pattern you like.
 
 Every `activate` sets all the options; the ones you leave out go back to their defaults.
 
@@ -84,8 +89,10 @@ and notifications disappear when it restarts. With `--no-restart` the tool leave
 
 `activate` copies `HexWallpaper.qml` and the compiled shaders `hexgrid.vert.qsb` and `hexgrid.frag.qsb` into
 `modules/background/` of the shell and inserts one `Loader` (marked with `caelestia-hexwall:begin/end` comments)
-into `Background.qml`. `deactivate` removes exactly that block and those files. The animation clock stops while
-UPower reports that the machine runs on battery or Caelestia's game mode is on, and the colours follow Caelestia's `Colours.light`.
+into `Background.qml`. `deactivate` removes exactly that block and those files. The wallpaper writes the seed it
+uses to `$XDG_RUNTIME_DIR/caelestia-hexwall/<monitor>.seed` (emptied at logout), where `status` finds it. The
+animation clock stops while UPower reports that the machine runs on battery or Caelestia's game mode is on, and the
+colours follow Caelestia's `Colours.light`.
 
 ## Development
 
