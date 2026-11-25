@@ -1,0 +1,42 @@
+# Sample config for caelestia-hexwall.
+# Use it with:  hexwall activate --config hexwall.conf.example
+# Copy it somewhere of your own first, e.g. ~/.config/hexwall.conf, and edit the copy.
+#
+# One "key = value" per line. Lines starting with # or ; are comments, and values may be in quotes.
+# Options given on the command line win over this file: hexwall activate --config FILE --theme dark
+
+# Palette: auto (follows the Caelestia light/dark mode), light or dark.
+theme = auto
+
+# Animation: auto (only on AC power, frozen on battery, in game mode and behind fullscreen windows),
+# on (always) or off (still picture).
+animate = auto
+
+# Hex size, from 0.25 to 8. 2 makes the hexes twice as big; the lines and the light keep their width.
+size = 1
+
+# Moves the whole pattern down by a part of a hex height, from 0 to 1 (one whole hex).
+shift = 0
+
+# Hex pattern: random (a new one at every launch, a different one on each monitor),
+# or a number from 0 to 65535 to keep one. `hexwall status` shows the ones in use.
+seed = random
+
+# Caelestia shell folder. ~ is your home folder; a relative path starts at this file's folder.
+# Default: $CAELESTIA_SHELL_DIR, then ~/.config/quickshell/caelestia.
+# shell-dir = ~/.config/quickshell/caelestia
+
+# yes: do not restart the shell after activate (it prints the command to run instead).
+# no-restart = no
+
+# Per-monitor settings: size, shift and seed for one monitor only. The names are the ones
+# `hyprctl monitors` shows. Monitors without a section use the values above.
+
+# [monitor eDP-1]
+# size = 1.5
+# seed = 41234
+
+# [monitor HDMI-A-1]
+# size = 2
+# shift = 0.5
+# seed = random

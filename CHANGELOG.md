@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- `--config FILE` takes the options from a text file (`key = value` lines with the same names as the flags:
+  `theme`, `animate`, `size`, `shift`, `seed`, `shell-dir`, `no-restart`). Flags on the command line win over it.
+- `[monitor NAME]` sections in the config set `size`, `shift` and `seed` for one monitor, so each screen of a
+  multi-monitor setup can have its own hex size, placement and pattern.
+
+### Changed
+- `hexwall status` groups the per-monitor settings under `Monitor NAME:`, showing only what differs from the main
+  settings there; the random seed each monitor picked moved from the `seed:` line into its group.
 
 ## [1.1.0] - 2026-11-25
 ### Added

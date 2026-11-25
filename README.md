@@ -53,6 +53,7 @@ hexwall activate --animate on     # animate on battery too
 hexwall activate --size 2         # hexes twice as big
 hexwall activate --shift 0.5      # the whole pattern half a hex lower
 hexwall activate --seed 41234     # keep one pattern instead of a new one at every launch
+hexwall activate --config path    # take the options from a file
 hexwall status                    # is it active, with which options and which seed
 hexwall deactivate                # disable hexwall
 ```
@@ -66,9 +67,45 @@ hexwall deactivate                # disable hexwall
   Default: `0`.
 - `--seed`: the hex pattern. `random` picks a new one at every launch, a different one on each monitor. A number
   from `0` to `65535` keeps that pattern on every monitor, through restarts and reboots. Default: `random`.
-  `hexwall status` shows the seed in use (`seed: random, now 41234 on eDP-1`), so you can keep a pattern you like.
+  `hexwall status` shows the seed each monitor uses, so you can keep a pattern you like:
+  ```
+  seed: random
+  Monitor eDP-1:
+    seed: random, now 41234
+  ```
 
 Every `activate` sets all the options; the ones you leave out go back to their defaults.
+
+**Config file**
+
+`--config FILE` reads the options from a text file instead of the command line, one `key = value` per line.
+The keys are the option names without the dashes: `theme`, `animate`, `size`, `shift`, `seed`, `shell-dir` and
+`no-restart` (`yes` or `no`). With several monitors, a `[monitor NAME]` section sets `size`, `shift` and `seed` for
+that monitor alone; the rest of the monitors use the values above the sections.
+
+```ini
+# ~/.config/hexwall.conf
+theme = auto
+animate = auto
+size = 1
+seed = random
+
+[monitor eDP-1]
+size = 1.5
+seed = 41234
+
+[monitor HDMI-A-1]
+size = 2
+shift = 0.5
+```
+
+- [`hexwall.conf.example`](hexwall.conf.example) has every option with its explanation; copy it and edit the copy.
+- Lines starting with `#` or `;` are comments; values may be in quotes.
+- Monitor names are the ones `hyprctl monitors` shows (and `hexwall status` lists as `Monitor NAME:`).
+- Options also given on the command line win over the file: `hexwall activate --config FILE --theme dark`.
+- A relative `shell-dir` starts at the config file's folder; `~` is your home folder.
+- `hexwall status` lists under `Monitor NAME:` only the settings that differ from the main ones on that monitor.
+- The file is read only by `activate`; after editing it, run `hexwall activate --config FILE` again.
 
 `activate` and `deactivate` restart the shell (`caelestia shell -r -d`) so the change shows at once. Open panels
 and notifications disappear when it restarts. With `--no-restart` the tool leaves it to you and prints the command.

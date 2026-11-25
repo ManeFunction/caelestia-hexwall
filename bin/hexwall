@@ -23,10 +23,10 @@ usage() {
 $NAME v$VERSION: animated hexagonal wallpaper for the Caelestia shell
 
 Usage:
-  $NAME activate [--theme light|dark|auto] [--animate on|off|auto] [--size N] [--shift N]
-                  [--seed N|random] [--shell-dir DIR] [--no-restart]
-  $NAME deactivate [--shell-dir DIR] [--no-restart]
-  $NAME status [--shell-dir DIR]
+  $NAME activate [--config FILE] [--theme light|dark|auto] [--animate on|off|auto] [--size N]
+                  [--shift N] [--seed N|random] [--shell-dir DIR] [--no-restart]
+  $NAME deactivate [--config FILE] [--shell-dir DIR] [--no-restart]
+  $NAME status [--config FILE] [--shell-dir DIR]
   $NAME --version (-v) | --help (-h)
 
 Theme:   auto (default, follows the Caelestia light/dark mode), light, dark.
@@ -37,6 +37,10 @@ Seed:    hex pattern: random (default, a new one at every launch), or a number f
          status shows the one in use.
 
 Every activate sets all options; the ones you leave out go back to their defaults.
+
+Config:  a text file with the same options, one "key = value" per line (theme, animate, size, shift,
+         seed, shell-dir, no-restart = yes|no). Options given on the command line win over it.
+         Sections "[monitor NAME]" (e.g. [monitor eDP-1]) set size, shift and seed for one monitor.
 
 The shell is looked up in \$CAELESTIA_SHELL_DIR, then ~/.config/quickshell/caelestia.
 If that folder does not exist and Caelestia is installed system-wide ($SYSTEM_SHELL),
@@ -64,10 +68,113 @@ size="1"
 grid_shift="0"
 seed="random"
 restart=1
+# per-monitor settings from the config's [monitor NAME] sections, in the order they appear
+mon_names=()
+declare -A mon_size=() mon_shift=() mon_seed=()
 
+# A plain decimal from $2 to $3 (it goes into the QML as is), compared in the C locale so 1.5 never reads as 1,5.
+decimal_in() {
+    [[ "$1" =~ ^(0|[1-9][0-9]*)(\.[0-9]+)?$ ]] \
+        && LC_ALL=C awk -v s="$1" -v lo="$2" -v hi="$3" 'BEGIN { exit !(s >= lo && s <= hi) }'
+}
+
+# Why value $2 is wrong for option $1, or nothing when it is fine.
+invalid() {
+    case "$1" in
+        theme) case "$2" in light|dark|auto) ;; *) echo "unknown theme: $2 (light, dark or auto)" ;; esac ;;
+        animate) case "$2" in on|off|auto) ;; *) echo "unknown animate value: $2 (on, off or auto)" ;; esac ;;
+        size) decimal_in "$2" "$SIZE_MIN" "$SIZE_MAX" \
+            || echo "invalid size: $2 (a number from $SIZE_MIN to $SIZE_MAX, like 2 or 1.5)" ;;
+        shift) decimal_in "$2" "$SHIFT_MIN" "$SHIFT_MAX" \
+            || echo "invalid shift: $2 (a number from $SHIFT_MIN to $SHIFT_MAX, like 0.5)" ;;
+        # random, or a pattern number (it goes into the QML as is; -1 there means random)
+        seed) if [ "$2" != random ] && { ! [[ "$2" =~ ^(0|[1-9][0-9]{0,4})$ ]] || [ "$2" -gt "$SEED_MAX" ]; }; then
+                echo "invalid seed: $2 (random, or a whole number from 0 to $SEED_MAX)"
+            fi ;;
+    esac
+}
+
+# The seed as the QML takes it: -1 for random.
+qml_seed() { if [ "$1" = random ]; then echo -1; else echo "$1"; fi; }
+
+# Reads the options from config file $1: "key = value" lines, # or ; comments, and [monitor NAME] sections
+# that set size, shift and seed for one monitor. Everything is checked here, with the line number on errors.
+load_config() {
+    local file="$1" line key value err section="" n=0
+    local re_section='^\[[[:space:]]*monitor[[:space:]]+([A-Za-z0-9._-]+)[[:space:]]*\]$'
+    local re_pair='^([a-z-]+)[[:space:]]*=[[:space:]]*(.*)$'
+    [ -f "$file" ] && [ -r "$file" ] || die "config not found: $file"
+    local base
+    base="$(cd "$(dirname "$file")" && pwd)"
+    while IFS= read -r line || [ -n "$line" ]; do
+        n=$((n + 1))
+        line="${line%$'\r'}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        case "$line" in ''|'#'*|';'*) continue ;; esac
+        if [[ "$line" =~ $re_section ]]; then
+            section="${BASH_REMATCH[1]}"
+            [[ " ${mon_names[*]-} " == *" $section "* ]] || mon_names+=("$section")
+            continue
+        fi
+        [[ "$line" != '['* ]] \
+            || die "$file:$n: unknown section: $line (only [monitor NAME], e.g. [monitor eDP-1])"
+        [[ "$line" =~ $re_pair ]] || die "$file:$n: expected \"key = value\": $line"
+        key="${BASH_REMATCH[1]}"
+        value="${BASH_REMATCH[2]}"
+        # a value may be quoted
+        if [[ "$value" =~ ^\"(.*)\"$ || "$value" =~ ^\'(.*)\'$ ]]; then value="${BASH_REMATCH[1]}"; fi
+        if [ -n "$section" ]; then
+            case "$key" in size|shift|seed) ;;
+                *) die "$file:$n: $key can not be set per monitor (only size, shift and seed)" ;;
+            esac
+        fi
+        case "$key" in
+            theme|animate|size|shift|seed)
+                err="$(invalid "$key" "$value")"
+                [ -z "$err" ] || die "$file:$n: $err" ;;
+            shell-dir)
+                [ -n "$value" ] || die "$file:$n: shell-dir needs a value"
+                # ~ is the home folder, and a relative path starts at the config's folder
+                case "$value" in \~) value="$HOME" ;; \~/*) value="$HOME/${value#\~/}" ;; esac
+                case "$value" in /*) ;; *) value="$base/$value" ;; esac ;;
+            no-restart)
+                case "$value" in yes|true|on) value=0 ;; no|false|off) value=1 ;;
+                    *) die "$file:$n: invalid no-restart: $value (yes or no)" ;;
+                esac ;;
+            *) die "$file:$n: unknown option: $key (theme, animate, size, shift, seed, shell-dir, no-restart)" ;;
+        esac
+        case "$section:$key" in
+            :theme) theme="$value" ;;
+            :animate) animate="$value" ;;
+            :size) size="$value" ;;
+            :shift) grid_shift="$value" ;;
+            :seed) seed="$value" ;;
+            :shell-dir) shell_dir="$value" ;;
+            :no-restart) restart="$value" ;;
+            *:size) mon_size[$section]="$value" ;;
+            *:shift) mon_shift[$section]="$value" ;;
+            *:seed) mon_seed[$section]="$value" ;;
+        esac
+    done < "$file"
+}
+
+# The config is read first wherever --config stands, so the other options on the command line win over it.
 parse_opts() {
+    local args=("$@") i config=""
+    for ((i = 0; i < ${#args[@]}; i++)); do
+        if [ "${args[i]}" = --config ]; then
+            [ $((i + 1)) -lt ${#args[@]} ] || die "--config needs a value"
+            [ -z "$config" ] || die "--config can only be given once"
+            config="${args[i + 1]}"
+            [ -n "$config" ] || die "--config needs a value"
+            i=$((i + 1))
+        fi
+    done
+    if [ -n "$config" ]; then load_config "$config"; fi
     while [ $# -gt 0 ]; do
         case "$1" in
+            --config) shift 2 ;;
             --theme) [ $# -ge 2 ] || die "--theme needs a value"; theme="$2"; shift 2 ;;
             --animate) [ $# -ge 2 ] || die "--animate needs a value"; animate="$2"; shift 2 ;;
             --size) [ $# -ge 2 ] || die "--size needs a value"; size="$2"; shift 2 ;;
@@ -79,12 +186,6 @@ parse_opts() {
         esac
     done
     shell_dir="${shell_dir:-${CAELESTIA_SHELL_DIR:-$HOME/.config/quickshell/caelestia}}"
-}
-
-# A plain decimal from $2 to $3 (it goes into the QML as is), compared in the C locale so 1.5 never reads as 1,5.
-decimal_in() {
-    [[ "$1" =~ ^(0|[1-9][0-9]*)(\.[0-9]+)?$ ]] \
-        && LC_ALL=C awk -v s="$1" -v lo="$2" -v hi="$3" 'BEGIN { exit !(s >= lo && s <= hi) }'
 }
 
 background_qml() { echo "$shell_dir/modules/background/Background.qml"; }
@@ -123,18 +224,29 @@ maybe_restart() {
 
 cmd_activate() {
     parse_opts "$@"
-    case "$theme" in light|dark|auto) ;; *) die "unknown theme: $theme (light, dark or auto)" ;; esac
-    case "$animate" in on|off|auto) ;; *) die "unknown animate value: $animate (on, off or auto)" ;; esac
-    decimal_in "$size" "$SIZE_MIN" "$SIZE_MAX" \
-        || die "invalid size: $size (a number from $SIZE_MIN to $SIZE_MAX, like 2 or 1.5)"
-    decimal_in "$grid_shift" "$SHIFT_MIN" "$SHIFT_MAX" \
-        || die "invalid shift: $grid_shift (a number from $SHIFT_MIN to $SHIFT_MAX, like 0.5)"
-    # random, or a pattern number (it goes into the QML as is; -1 there means random)
-    if [ "$seed" != random ] && { ! [[ "$seed" =~ ^(0|[1-9][0-9]{0,4})$ ]] || [ "$seed" -gt "$SEED_MAX" ]; }; then
-        die "invalid seed: $seed (random, or a whole number from 0 to $SEED_MAX)"
+    local opt err
+    for opt in "theme $theme" "animate $animate" "size $size" "shift $grid_shift" "seed $seed"; do
+        err="$(invalid "${opt%% *}" "${opt#* }")"
+        [ -z "$err" ] || die "$err"
+    done
+
+    # one line per monitor from the config, like: "eDP-1": { size: 2, seed: 41234 },
+    local m entry monitors=""
+    for m in ${mon_names[@]+"${mon_names[@]}"}; do
+        entry=""
+        if [ -n "${mon_size[$m]:-}" ]; then entry="$entry, size: ${mon_size[$m]}"; fi
+        if [ -n "${mon_shift[$m]:-}" ]; then entry="$entry, shift: ${mon_shift[$m]}"; fi
+        if [ -n "${mon_seed[$m]:-}" ]; then entry="$entry, seed: $(qml_seed "${mon_seed[$m]}")"; fi
+        [ -n "$entry" ] || continue
+        monitors="$monitors                        \"$m\": { ${entry#, } },
+"
+    done
+    if [ -n "$monitors" ]; then
+        monitors="                    monitors: ({
+${monitors%,$'\n'}
+                    })
+"
     fi
-    local qml_seed="$seed"
-    if [ "$seed" = random ]; then qml_seed=-1; fi
 
     local data
     data="$(data_dir)"
@@ -170,8 +282,8 @@ cmd_activate() {
                     animation: \"$animate\"
                     size: $size
                     shift: $grid_shift
-                    seed: $qml_seed
-                }
+                    seed: $(qml_seed "$seed")
+${monitors}                }
             }
             $MARK_END
 "
@@ -195,32 +307,87 @@ cmd_deactivate() {
 }
 
 # The seeds the running wallpaper picked when it last loaded, one file per monitor (written by HexWallpaper.qml;
-# the folder is emptied at logout), as ", now 41234 on eDP-1, 517 on HDMI-A-1". Nothing when there are none.
+# the folder is emptied at logout), as "eDP-1 41234" lines. Nothing when there are none.
 seeds_in_use() {
-    local dir="${XDG_RUNTIME_DIR:-}/caelestia-hexwall" f n list=""
+    local dir="${XDG_RUNTIME_DIR:-}/caelestia-hexwall" f n
     if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$dir" ]; then return 0; fi
     for f in "$dir"/*.seed; do
         [ -f "$f" ] || continue
         n="$(head -c 32 "$f" | tr -d '[:space:]')"
-        if [[ "$n" =~ ^[0-9]{1,5}$ ]]; then list="$list, $n on $(basename "$f" .seed)"; fi
+        if [[ "$n" =~ ^[0-9]{1,5}$ ]]; then echo "$(basename "$f" .seed) $n"; fi
     done
-    if [ -n "$list" ]; then echo ", now ${list#, }"; fi
 }
 
-# The settings read back from the inserted block; older blocks lack the newer ones, which read as their defaults
-# (size 1, shift 0, seed random). With a random seed, the ones in use now are added.
-without_markers_info() {
-    awk -v b="$MARK_BEGIN" -v e="$MARK_END" -v now="$(seeds_in_use)" '
-        BEGIN { size = "1"; shift = "0"; seed = "-1" }
+# The settings read back from the inserted block as "key value" lines, and "monitor NAME key value" for each
+# per-monitor one from a config. Older blocks lack the newer settings, which read as their defaults
+# (size 1, shift 0, seed -1 = random).
+block_settings() {
+    awk -v b="$MARK_BEGIN" -v e="$MARK_END" '
+        BEGIN { theme = "auto"; animate = "auto"; size = "1"; shift = "0"; seed = "-1" }
         index($0, b) { on = 1 }
-        on && /theme:/ { gsub(/"/, "", $2); print "theme: " $2 }
-        on && /animation:/ { gsub(/"/, "", $2); print "animate: " $2 }
-        on && /size:/ { size = $2 }
-        on && /shift:/ { shift = $2 }
-        on && /seed:/ { seed = $2 }
+        on && /^ *"[^"]+": \{/ {
+            name = $0; sub(/^ *"/, "", name); sub(/".*/, "", name)
+            body = $0; sub(/^[^{]*\{ */, "", body); sub(/ *\}.*/, "", body)
+            n = split(body, kv, /, */)
+            for (i = 1; i <= n; i++) { split(kv[i], p, /: */); mons = mons "monitor " name " " p[1] " " p[2] "\n" }
+            next
+        }
+        on && /^ *theme:/ { theme = $2; gsub(/"/, "", theme) }
+        on && /^ *animation:/ { animate = $2; gsub(/"/, "", animate) }
+        on && /^ *size:/ { size = $2 }
+        on && /^ *shift:/ { shift = $2 }
+        on && /^ *seed:/ { seed = $2 }
         index($0, e) { on = 0 }
-        END { print "size: " size; print "shift: " shift; print "seed: " ((seed == "-1") ? ("random" now) : seed) }
+        END {
+            print "theme " theme; print "animate " animate; print "size " size; print "shift " shift; print "seed " seed
+            printf "%s", mons
+        }
     ' "$(background_qml)"
+}
+
+# Two decimals that read as different numbers (2 and 2.0 are the same).
+differ() { LC_ALL=C awk -v a="$1" -v b="$2" 'BEGIN { exit !(a + 0 != b + 0) }'; }
+
+# The settings, then under "Monitor NAME:" the ones that are different on that monitor: its own size, shift and
+# seed from a config, and the random seed it picked.
+print_status() {
+    local key a b c st_theme="" st_animate="" st_size="" st_shift="" st_seed="" names=() m lines
+    local -A o_size=() o_shift=() o_seed=() now=()
+    while read -r key a b c; do
+        case "$key" in
+            theme) st_theme="$a" ;;
+            animate) st_animate="$a" ;;
+            size) st_size="$a" ;;
+            shift) st_shift="$a" ;;
+            seed) st_seed="$a" ;;
+            monitor)
+                names+=("$a")
+                case "$b" in size) o_size[$a]="$c" ;; shift) o_shift[$a]="$c" ;; seed) o_seed[$a]="$c" ;; esac ;;
+        esac
+    done < <(block_settings)
+    while read -r a b; do names+=("$a"); now[$a]="$b"; done < <(seeds_in_use)
+
+    echo "theme: $st_theme"
+    echo "animate: $st_animate"
+    echo "size: $st_size"
+    echo "shift: $st_shift"
+    if [ "$st_seed" = -1 ]; then echo "seed: random"; else echo "seed: $st_seed"; fi
+
+    [ ${#names[@]} -gt 0 ] || return 0
+    while read -r m; do
+        lines=""
+        if [ -n "${o_size[$m]:-}" ] && differ "${o_size[$m]}" "$st_size"; then lines="$lines  size: ${o_size[$m]}"$'\n'; fi
+        if [ -n "${o_shift[$m]:-}" ] && differ "${o_shift[$m]}" "$st_shift"; then lines="$lines  shift: ${o_shift[$m]}"$'\n'; fi
+        local s="${o_seed[$m]:-$st_seed}"
+        if [ "$s" = -1 ]; then
+            # a random seed is worth showing when it is this monitor's own, or when we know the one it picked
+            if [ -n "${now[$m]:-}" ]; then lines="$lines  seed: random, now ${now[$m]}"$'\n'
+            elif [ -n "${o_seed[$m]:-}" ] && [ "$st_seed" != -1 ]; then lines="$lines  seed: random"$'\n'; fi
+        elif [ "$s" != "$st_seed" ]; then
+            lines="$lines  seed: $s"$'\n'
+        fi
+        if [ -n "$lines" ]; then printf 'Monitor %s:\n%s' "$m" "$lines"; fi
+    done < <(printf '%s\n' "${names[@]}" | LC_ALL=C sort -u)
 }
 
 cmd_status() {
@@ -229,7 +396,7 @@ cmd_status() {
     [ -f "$(background_qml)" ] || { echo "no Caelestia shell here"; return 0; }
     if has_block; then
         local info
-        info="$(without_markers_info)"
+        info="$(print_status)"
         echo "active: yes"
         echo "$info"
     else

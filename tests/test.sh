@@ -109,16 +109,89 @@ check "--seed random goes back to a random seed" 'grep -qE "^ +seed: -1$" "$BG"'
 # the running wallpaper writes the seed it picked, one file per monitor
 mkdir -p "$XDG_RUNTIME_DIR/caelestia-hexwall"
 echo 41234 > "$XDG_RUNTIME_DIR/caelestia-hexwall/DP-1.seed"
-check "status shows the random seed in use" '"$TOOL" status --shell-dir "$SH" | grep -qx "seed: random, now 41234 on DP-1"'
+check "status shows the random seed in use under its monitor" '"$TOOL" status --shell-dir "$SH" | grep -A1 -x "Monitor DP-1:" | grep -qx "  seed: random, now 41234"'
+check "the main seed line stays plain" '"$TOOL" status --shell-dir "$SH" | grep -qx "seed: random"'
 echo 517 > "$XDG_RUNTIME_DIR/caelestia-hexwall/DP-2.seed"
 echo "oops" > "$XDG_RUNTIME_DIR/caelestia-hexwall/DP-3.seed"
-check "status lists every monitor and skips broken files" '"$TOOL" status --shell-dir "$SH" | grep -qx "seed: random, now 41234 on DP-1, 517 on DP-2"'
+check "status lists every monitor and skips broken files" '[ "$("$TOOL" status --shell-dir "$SH" | sed -n "/^Monitor/,\$p")" = "$(printf "Monitor DP-1:\n  seed: random, now 41234\nMonitor DP-2:\n  seed: random, now 517")" ]'
 "$TOOL" activate --seed 7 --shell-dir "$SH" >/dev/null
 check "a set seed is shown as set" '"$TOOL" status --shell-dir "$SH" | grep -qx "seed: 7"'
+check "a set seed hides the monitors that use it" '! "$TOOL" status --shell-dir "$SH" | grep -q "^Monitor"'
 sed -i '/^ *seed: /d' "$BG"
 check "a block from before --seed reports a random seed" '"$TOOL" status --shell-dir "$SH" | grep -q "^seed: random"'
 rm -r "$XDG_RUNTIME_DIR/caelestia-hexwall"
 "$TOOL" activate --shell-dir "$SH" >/dev/null
+
+# config file: the same options as the flags, plus size, shift and seed per monitor
+CFG="$TMP/hexwall.conf"
+cat > "$CFG" <<EOF
+# a comment
+; another one
+theme = dark
+animate = "off"
+size = 1.5
+shift = 0.25
+seed = 99
+shell-dir = $SH
+no-restart = yes
+
+[monitor eDP-1]
+size = 2
+seed = 41234
+
+[monitor HDMI-A-1]
+shift = 0.5
+seed = random
+EOF
+before="$(grep -c "shell -r -d" "$TMP/caelestia.log")"
+"$TOOL" activate --config "$CFG" >/dev/null
+check "--config sets the options" 'grep -q "theme: \"dark\"" "$BG" && grep -q "animation: \"off\"" "$BG" && grep -qE "^ +size: 1.5$" "$BG" && grep -qE "^ +shift: 0.25$" "$BG" && grep -qE "^ +seed: 99$" "$BG"'
+check "--config sets shell-dir and no-restart" '[ "$(grep -c "shell -r -d" "$TMP/caelestia.log")" = "$before" ]'
+check "--config writes the monitors" 'grep -qF "\"eDP-1\": { size: 2, seed: 41234 }," "$BG" && grep -qF "\"HDMI-A-1\": { shift: 0.5, seed: -1 }" "$BG"'
+check "status shows the settings under each monitor" '[ "$("$TOOL" status --shell-dir "$SH" | sed -n "/^Monitor/,\$p")" = "$(printf "Monitor HDMI-A-1:\n  shift: 0.5\n  seed: random\nMonitor eDP-1:\n  size: 2\n  seed: 41234")" ]'
+mkdir -p "$XDG_RUNTIME_DIR/caelestia-hexwall"
+echo 41234 > "$XDG_RUNTIME_DIR/caelestia-hexwall/eDP-1.seed"
+echo 300 > "$XDG_RUNTIME_DIR/caelestia-hexwall/HDMI-A-1.seed"
+echo 99 > "$XDG_RUNTIME_DIR/caelestia-hexwall/DP-3.seed"
+check "status adds the seeds in use, and skips monitors like the main settings" '[ "$("$TOOL" status --shell-dir "$SH" | sed -n "/^Monitor/,\$p")" = "$(printf "Monitor HDMI-A-1:\n  shift: 0.5\n  seed: random, now 300\nMonitor eDP-1:\n  size: 2\n  seed: 41234")" ]'
+rm -r "$XDG_RUNTIME_DIR/caelestia-hexwall"
+printf "size = 1.5\n[monitor DP-1]\nsize = 1.50\nshift = 0\n" > "$TMP/same.conf"
+"$TOOL" activate --config "$TMP/same.conf" --shell-dir "$SH" --no-restart >/dev/null
+check "monitor settings equal to the main ones are not shown" '! "$TOOL" status --shell-dir "$SH" | grep -q "^Monitor"'
+"$TOOL" activate --config "$CFG" >/dev/null
+check "monitors do not change the global status" '"$TOOL" status --shell-dir "$SH" | grep -qx "size: 1.5" && "$TOOL" status --shell-dir "$SH" | grep -qx "shift: 0.25" && "$TOOL" status --shell-dir "$SH" | grep -qx "seed: 99"'
+"$TOOL" activate --size 3 --config "$CFG" --seed random >/dev/null
+check "flags win over the config, wherever --config stands" 'grep -qE "^ +size: 3$" "$BG" && grep -qE "^ +seed: -1$" "$BG" && grep -q "theme: \"dark\"" "$BG"'
+printf 'theme = light\n' > "$TMP/plain.conf"
+"$TOOL" activate --config "$TMP/plain.conf" --shell-dir "$SH" --no-restart >/dev/null
+check "a config without monitors writes none" '! grep -q "monitors:" "$BG" && grep -q "theme: \"light\"" "$BG"'
+mkdir -p "$TMP/cfgdir"
+printf 'shell-dir = ../shell\nno-restart = true\n' > "$TMP/cfgdir/rel.conf"
+check "a relative shell-dir starts at the config folder" '"$TOOL" activate --config "$TMP/cfgdir/rel.conf" >/dev/null'
+cp "$BG" "$TMP/before-bad.qml"
+bad_cfg() { # $1 = name, $2 = config text
+    printf '%b' "$2" > "$TMP/bad.conf"
+    if "$TOOL" activate --config "$TMP/bad.conf" --shell-dir "$SH" --no-restart >/dev/null 2>&1; then bad "$1"; else ok "$1"; fi
+}
+bad_cfg "config: unknown key is rejected" 'colour = red\n'
+bad_cfg "config: bad theme is rejected" 'theme = blue\n'
+bad_cfg "config: bad size is rejected" 'size = 9\n'
+bad_cfg "config: bad monitor seed is rejected" '[monitor eDP-1]\nseed = 70000\n'
+bad_cfg "config: theme per monitor is rejected" '[monitor eDP-1]\ntheme = dark\n'
+bad_cfg "config: unknown section is rejected" '[colors]\n'
+bad_cfg "config: unsafe monitor name is rejected" '[monitor "x"]\nsize = 2\n'
+bad_cfg "config: a line without = is rejected" 'size 2\n'
+bad_cfg "config: bad no-restart is rejected" 'no-restart = maybe\n'
+check "a rejected config leaves the block alone" 'cmp -s "$BG" "$TMP/before-bad.qml"'
+check "the error names the file and line" '{ "$TOOL" activate --config "$TMP/bad.conf" --shell-dir "$SH" 2>&1 >/dev/null || true; } | grep -qF "bad.conf:1: invalid no-restart"'
+if "$TOOL" activate --config "$TMP/missing.conf" --shell-dir "$SH" >/dev/null 2>&1; then bad "missing config is rejected"; else ok "missing config is rejected"; fi
+if "$TOOL" activate --config >/dev/null 2>&1; then bad "--config needs a value"; else ok "--config needs a value"; fi
+if "$TOOL" activate --config "$CFG" --config "$CFG" >/dev/null 2>&1; then bad "--config only once"; else ok "--config only once"; fi
+printf 'size = 2\r\n[monitor DP-1]\r\nshift = 1\r\n' > "$TMP/crlf.conf"
+"$TOOL" activate --config "$TMP/crlf.conf" --shell-dir "$SH" --no-restart >/dev/null
+check "a config with Windows line ends works" 'grep -qE "^ +size: 2$" "$BG" && grep -qF "\"DP-1\": { shift: 1 }" "$BG"'
+"$TOOL" activate --shell-dir "$SH" >/dev/null
+check "activate without the config drops the monitors" '! grep -q "monitors:" "$BG" && ! "$TOOL" status --shell-dir "$SH" | grep -q "^monitor"'
 
 check "status reports it" '"$TOOL" status --shell-dir "$SH" | grep -q "active: yes"'
 "$TOOL" deactivate --shell-dir "$SH" >/dev/null

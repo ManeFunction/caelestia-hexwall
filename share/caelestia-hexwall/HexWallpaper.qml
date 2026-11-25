@@ -16,25 +16,34 @@ Item {
     // Set by `hexwall activate`: theme "auto" | "light" | "dark", animation "auto" | "on" | "off",
     // size: hex size multiplier (1 = hexes 64 px apart; lines and glow keep their width in pixels),
     // shift: moves the whole pattern down by a part of a hex height (0 to 1),
-    // seed: hex pattern from 0 to 65535, or -1 for a random one at every launch
+    // seed: hex pattern from 0 to 65535, or -1 for a random one at every launch,
+    // monitors: size, shift and seed for single monitors from a config, like { "eDP-1": { size: 2, seed: 41234 } }
     property string theme: "auto"
     property string animation: "auto"
     property real size: 1
     property real shift: 0
     property int seed: -1
+    property var monitors: ({})
+
+    // the monitor this wallpaper is on, and what is set for it alone
+    readonly property string screenName: (QsWindow.window as QsWindow)?.screen?.name ?? ""
+    readonly property var own: monitors[screenName] ?? ({})
+    readonly property real ownSize: own.size ?? size
+    readonly property real ownShift: own.shift ?? shift
+    readonly property int ownSeed: own.seed ?? seed
 
     // The pattern shown (which hexes are lighter, darker or black, and when each one lights up): the set seed,
     // or a random one picked when the wallpaper loads, so each monitor gets its own
-    readonly property int currentSeed: seed >= 0 ? seed : Math.floor(Math.random() * 65536)
+    readonly property int currentSeed: ownSeed >= 0 ? ownSeed : Math.floor(Math.random() * 65536)
 
     // `hexwall status` reads the seed in use from $XDG_RUNTIME_DIR/caelestia-hexwall/<monitor>.seed
     // (emptied at logout, like the random seeds it holds)
     readonly property string seedPath: {
         const dir = Quickshell.env("XDG_RUNTIME_DIR");
-        const name = (QsWindow.window as QsWindow)?.screen?.name ?? "";
-        return dir && name ? `${dir}/caelestia-hexwall/${name}.seed` : "";
+        return dir && screenName ? `${dir}/caelestia-hexwall/${screenName}.seed` : "";
     }
     onSeedPathChanged: saveSeed()
+    onCurrentSeedChanged: saveSeed()
     Component.onCompleted: saveSeed()
 
     function saveSeed(): void {
@@ -81,8 +90,8 @@ Item {
         // Animation phases, wrapped here in double precision so the shader never sees a large time value
         property real pulse: (root.t * 0.35) % (2 * Math.PI)
         property real spin: (root.t * 1.1) % (2 * Math.PI)
-        property real cell: 64 * root.size
-        property real shift: root.shift
+        property real cell: 64 * root.ownSize
+        property real shift: root.ownShift
         property real lightMix: root.lightMix
         property size res: Qt.size(width, height)
         // the dither pattern works on device pixels (1.6 per logical pixel at 160% scale)
