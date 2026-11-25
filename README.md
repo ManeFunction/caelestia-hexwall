@@ -22,7 +22,7 @@ You can change hexes `--size`, vertical `--shift` or pin your favourite random p
   battery, while Caelestia's game mode is on, or while a window is fullscreen on that monitor. `--animate on|off` overrides that.
 - **Follows the theme:** by default it switches between light and dark palettes when Caelestia is in light or dark mode accordingly.
   `--theme light|dark` forces one.
-- **Light on the system:** one shader pass, no video, no extra daemon. It is drawn by the shell itself, on top of
+- **Light on the system:** one shader pass, no video, no extra daemon. It is drawn by the shell itself, replacing
   your normal wallpaper.
 - **Easy to remove:** `hexwall deactivate` puts the shell back exactly as it was.
 
